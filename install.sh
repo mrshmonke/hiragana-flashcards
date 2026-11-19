@@ -20,7 +20,8 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib  # noqa: E402
 
-APP_VERSION = 2
+APP_VERSION = 3
+APP_ID = "io.github.mrshmonke.HiraganaFlashcards"
 UPDATE_URL = ("https://raw.githubusercontent.com/mrshmonke/"
               "hiragana-flashcards/main/hiragana.py")
 
@@ -718,9 +719,9 @@ def fetch_update():
         return None
 
 
-class App(Gtk.Window):
-    def __init__(self):
-        super().__init__(title="Hiragana Flashcards")
+class App(Gtk.ApplicationWindow):
+    def __init__(self, application):
+        super().__init__(application=application, title="Hiragana Flashcards")
         self.set_default_size(600, 560)
         self.set_icon_name("accessories-dictionary")
         provider = Gtk.CssProvider()
@@ -774,7 +775,6 @@ class App(Gtk.Window):
         self.stack.add_titled(self.dict_page, "dict", "Dictionary")
 
         self.connect("key-press-event", self.on_key)
-        self.connect("destroy", Gtk.main_quit)
         self.show_all()
         self.refresh_all()
         self.new_source = None
@@ -803,7 +803,10 @@ class App(Gtk.Window):
             self.update_btn.set_label("Update failed")
             self.update_btn.set_tooltip_text(str(e))
             return
-        os.execv(sys.executable, [sys.executable, path])
+        # Quit first so this copy lets go of the single-instance lock, then
+        # start the new version once we are out of the main loop.
+        self.get_application().restart = path
+        self.get_application().quit()
 
     # ----- card sources -----
     def kana_cards(self):
@@ -910,9 +913,26 @@ class App(Gtk.Window):
         dlg.destroy()
 
 
+class Main(Gtk.Application):
+    """Only one copy runs at a time: launching again just brings the open
+    window to the front."""
+
+    def __init__(self):
+        super().__init__(application_id=APP_ID)
+        self.window = None
+        self.restart = None
+
+    def do_activate(self):
+        if self.window is None:
+            self.window = App(self)
+        self.window.present()
+
+
 if __name__ == "__main__":
-    App()
-    Gtk.main()
+    app = Main()
+    app.run(None)
+    if app.restart:
+        os.execv(sys.executable, [sys.executable, app.restart])
 PYEOF
 chmod +x "$DIR/hiragana.py"
 cat > "$HOME/.local/share/applications/hiragana-flashcards.desktop" <<DEOF
