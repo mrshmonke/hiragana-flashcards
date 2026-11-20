@@ -1,0 +1,11 @@
+/* Bundled fonts (SIL Open Font License / Apache 2.0), subset to kana, punctuation and Latin.
+   Served from this app, so nothing loads from Google. Kanji fall back to system fonts. */
+@font-face { font-family: "Klee One"; src: url("KleeOne-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Klee One"; src: url("KleeOne-SemiBold.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Noto Serif JP"; src: url("NotoSerifJP.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Noto Sans JP"; src: url("NotoSansJP.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Kosugi Maru"; src: url("KosugiMaru-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Yomogi"; src: url("Yomogi-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Zen Kurenaido"; src: url("ZenKurenaido-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "DotGothic16"; src: url("DotGothic16-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Crimson Pro"; src: url("CrimsonPro-Italic.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }

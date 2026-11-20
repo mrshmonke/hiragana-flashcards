@@ -1,21 +1,49 @@
 #!/usr/bin/python3
-"""Hiragana flashcards, vocab and dictionary: a small GTK app for Ubuntu."""
+"""Japanese Tutor for Ubuntu: a Claude tutor you can talk to, plus kana,
+vocab, dictionary and progress, in one window.
+
+The window hosts the tutor UI (the repo's docs/ folder) in WebKitGTK, served
+on 127.0.0.1 by a small local helper (voice-helper/jp_voice.py) that also does
+offline speech: Whisper to hear you, Open JTalk and Piper to talk back.
+If WebKitGTK isn't installed, it falls back to the original GTK flashcards."""
+import io
 import json
 import os
 import random
 import re
+import shutil
+import subprocess
 import sys
+import tarfile
 import threading
+import time
 import urllib.request
 
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib  # noqa: E402
 
-APP_VERSION = 5
+APP_VERSION = 6
 APP_ID = "io.github.mrshmonke.HiraganaFlashcards"
 UPDATE_URL = ("https://raw.githubusercontent.com/mrshmonke/"
               "hiragana-flashcards/main/hiragana.py")
+REPO_TARBALL = ("https://codeload.github.com/mrshmonke/"
+                "hiragana-flashcards/tar.gz/refs/heads/main")
+TUTOR_HOME = os.path.join(os.path.expanduser("~"), ".local", "share", "japanese-tutor")
+TUTOR_APP = os.path.join(TUTOR_HOME, "app")
+HELPER_DIR = os.path.join(TUTOR_HOME, "voice-helper")
+HELPER_PY = os.path.join(TUTOR_HOME, "venv", "bin", "python")
+HELPER_URL = "http://127.0.0.1:8770"
+STAMP = os.path.join(TUTOR_HOME, "app-version")
+
+try:
+    try:
+        gi.require_version("WebKit2", "4.1")
+    except ValueError:
+        gi.require_version("WebKit2", "4.0")
+    from gi.repository import WebKit2  # noqa: E402
+except (ValueError, ImportError):
+    WebKit2 = None
 # Textbook-style kana font (Klee One, SIL Open Font License), like a printed
 # hiragana chart. Downloaded once into the user's font folder.
 FONT_URL = ("https://raw.githubusercontent.com/google/fonts/main/"
@@ -773,7 +801,17 @@ class App(Gtk.ApplicationWindow):
         self.update_btn.connect("clicked", self.install_update)
         header.pack_end(self.update_btn)
         self.set_titlebar(header)
-        self.add(self.stack)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        if WebKit2 is None:
+            # The tutor window needs WebKitGTK; say how to get it.
+            bar = Gtk.InfoBar(message_type=Gtk.MessageType.INFO)
+            msg = Gtk.Label(xalign=0, selectable=True, wrap=True)
+            msg.set_markup("To get the Claude tutor in this app, install WebKitGTK once, "
+                           "then reopen:\n<tt>sudo apt install gir1.2-webkit2-4.1</tt>")
+            bar.get_content_area().add(msg)
+            box.pack_start(bar, False, False, 0)
+        box.pack_start(self.stack, True, True, 0)
+        self.add(box)
 
         self.kana_page = Flashcards(self.kana_cards, "Pick a study set.")
 
@@ -942,6 +980,155 @@ class App(Gtk.ApplicationWindow):
         dlg.destroy()
 
 
+# ---------------------------------------------------------------- tutor app
+def sync_app_files(force=False):
+    """Download the tutor UI and voice helper from GitHub when this version's
+    copy isn't there yet. Returns True if the files are in place."""
+    try:
+        if not force and open(STAMP).read().strip() == str(APP_VERSION) \
+                and os.path.exists(os.path.join(TUTOR_APP, "index.html")):
+            return True
+    except OSError:
+        pass
+    try:
+        with urllib.request.urlopen(REPO_TARBALL, timeout=60) as r:
+            data = r.read()
+        tmp = TUTOR_HOME + ".new"
+        shutil.rmtree(tmp, ignore_errors=True)
+        os.makedirs(tmp)
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
+            for m in tar.getmembers():
+                parts = m.name.split("/", 1)
+                if len(parts) < 2 or not (parts[1].startswith("docs/") or parts[1].startswith("voice-helper/")):
+                    continue
+                if not (m.isfile() or m.isdir()) or ".." in parts[1].split("/"):
+                    continue
+                m.name = parts[1].replace("docs/", "app/", 1)
+                tar.extract(m, tmp)
+        os.makedirs(TUTOR_HOME, exist_ok=True)
+        for sub in ("app", "voice-helper"):
+            src, dst = os.path.join(tmp, sub), os.path.join(TUTOR_HOME, sub)
+            if os.path.isdir(src):
+                shutil.rmtree(dst + ".old", ignore_errors=True)
+                if os.path.exists(dst):
+                    os.rename(dst, dst + ".old")
+                os.rename(src, dst)
+                shutil.rmtree(dst + ".old", ignore_errors=True)
+        shutil.rmtree(tmp, ignore_errors=True)
+        with open(STAMP, "w") as f:
+            f.write(str(APP_VERSION))
+        return True
+    except Exception as e:
+        print("Couldn't update tutor files:", e, file=sys.stderr)
+        return os.path.exists(os.path.join(TUTOR_APP, "index.html"))
+
+
+def helper_up():
+    try:
+        with urllib.request.urlopen(HELPER_URL + "/health", timeout=1) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
+def start_helper():
+    """Start the local helper. Uses the voice environment if it's installed,
+    otherwise plain python3 (the tutor works, voice input stays off)."""
+    py = HELPER_PY if os.path.exists(HELPER_PY) else "/usr/bin/python3"
+    script = os.path.join(HELPER_DIR, "jp_voice.py")
+    logf = open(os.path.join(TUTOR_HOME, "voice-helper.log"), "a")
+    return subprocess.Popen([py, script], stdout=logf, stderr=subprocess.STDOUT,
+                            start_new_session=True)
+
+
+LOADING_HTML = """<html><body style="font-family:sans-serif;display:flex;
+align-items:center;justify-content:center;height:90vh;color:#666">
+<div style="text-align:center"><div style="font-size:64px">あ</div>%s</div></body></html>"""
+
+
+class TutorWindow(Gtk.ApplicationWindow):
+    def __init__(self, application):
+        super().__init__(application=application, title="Japanese Tutor")
+        self.set_default_size(1000, 760)
+        self.set_icon_name("accessories-dictionary")
+        self.helper = None
+        self.new_source = None
+
+        header = Gtk.HeaderBar(show_close_button=True, title="Japanese Tutor")
+        self.update_btn = Gtk.Button(label="Update ready")
+        self.update_btn.get_style_context().add_class("suggested-action")
+        self.update_btn.set_no_show_all(True)
+        self.update_btn.connect("clicked", self.install_update)
+        header.pack_end(self.update_btn)
+        self.set_titlebar(header)
+
+        data_dir = os.path.join(TUTOR_HOME, "webdata")
+        manager = WebKit2.WebsiteDataManager(
+            base_data_directory=os.path.join(data_dir, "data"),
+            base_cache_directory=os.path.join(data_dir, "cache"))
+        ctx = WebKit2.WebContext.new_with_website_data_manager(manager)
+        ctx.connect("download-started", self.on_download)
+        self.view = WebKit2.WebView.new_with_context(ctx)
+        st = self.view.get_settings()
+        st.set_property("media-playback-requires-user-gesture", False)
+        st.set_property("enable-developer-extras", False)
+        st.set_property("javascript-can-access-clipboard", True)
+        self.view.connect("decide-policy", self.on_policy)
+        self.view.load_html(LOADING_HTML % "Starting…", "about:blank")
+        self.add(self.view)
+        self.connect("destroy", self.on_destroy)
+        self.show_all()
+        threading.Thread(target=self.boot, daemon=True).start()
+
+    def boot(self):
+        if not sync_app_files():
+            GLib.idle_add(self.view.load_html, LOADING_HTML %
+                          "Couldn't download the tutor. Check your internet connection and reopen the app.",
+                          "about:blank")
+            return
+        if not helper_up():
+            self.helper = start_helper()
+            for _ in range(100):
+                if helper_up():
+                    break
+                time.sleep(0.1)
+        GLib.idle_add(self.view.load_uri, HELPER_URL + "/")
+        src = fetch_update()
+        if src:
+            GLib.idle_add(self.offer_update, src)
+
+    def on_policy(self, view, decision, kind):
+        # Open outside links (e.g. console.anthropic.com) in the default browser.
+        if kind in (WebKit2.PolicyDecisionType.NAVIGATION_ACTION,
+                    WebKit2.PolicyDecisionType.NEW_WINDOW_ACTION):
+            uri = decision.get_navigation_action().get_request().get_uri()
+            if uri.startswith("http") and not uri.startswith(HELPER_URL):
+                Gtk.show_uri_on_window(self, uri, Gdk.CURRENT_TIME)
+                decision.ignore()
+                return True
+        return False
+
+    def on_download(self, _ctx, download):
+        def decide(dl, suggested):
+            folder = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD) \
+                or os.path.expanduser("~")
+            dl.set_destination("file://" + os.path.join(folder, suggested or "download"))
+            return True
+        download.connect("decide-destination", decide)
+
+    def offer_update(self, src):
+        self.new_source = src
+        self.update_btn.show()
+        return False
+
+    def install_update(self, _btn):
+        App.install_update(self, _btn)
+
+    def on_destroy(self, *_a):
+        if self.helper and self.helper.poll() is None:
+            self.helper.terminate()
+
+
 class Main(Gtk.Application):
     """Only one copy runs at a time: launching again just brings the open
     window to the front."""
@@ -953,7 +1140,7 @@ class Main(Gtk.Application):
 
     def do_activate(self):
         if self.window is None:
-            self.window = App(self)
+            self.window = TutorWindow(self) if WebKit2 else App(self)
         self.window.present()
 
 
