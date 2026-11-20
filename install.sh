@@ -20,10 +20,18 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib  # noqa: E402
 
-APP_VERSION = 3
+APP_VERSION = 4
 APP_ID = "io.github.mrshmonke.HiraganaFlashcards"
 UPDATE_URL = ("https://raw.githubusercontent.com/mrshmonke/"
               "hiragana-flashcards/main/hiragana.py")
+# Textbook-style kana font (Klee One, SIL Open Font License), like a printed
+# hiragana chart. Downloaded once into the user's font folder.
+FONT_URL = ("https://raw.githubusercontent.com/google/fonts/main/"
+            "ofl/kleeone/KleeOne-SemiBold.ttf")
+FONT_DIR = os.path.join(os.path.expanduser("~"), ".local", "share", "fonts")
+FONT_FILE = os.path.join(FONT_DIR, "KleeOne-SemiBold.ttf")
+# Readings that break their row's pattern, marked * as in textbook charts.
+IRREGULAR = {"shi", "chi", "tsu"}
 
 GROUPS = [
     ("Vowels", "あa いi うu えe おo"),
@@ -444,14 +452,14 @@ CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".config", "hiragana-flashcar
 CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
 
 CSS = b"""
-.kana { font-size: 140px; font-family: "Noto Sans CJK JP", "Noto Sans JP", sans-serif; }
-.word { font-size: 64px; font-family: "Noto Sans CJK JP", "Noto Sans JP", sans-serif; }
+.kana { font-size: 150px; font-weight: 600; font-family: "Klee One", "Noto Sans CJK JP", "Noto Sans JP", sans-serif; }
+.word { font-size: 64px; font-weight: 600; font-family: "Klee One", "Noto Sans CJK JP", "Noto Sans JP", sans-serif; }
 .english { font-size: 36px; }
-.romaji { font-size: 40px; color: #2a7ae2; }
+.romaji { font-size: 40px; font-style: italic; color: #555555; font-family: "Crimson Pro", "DejaVu Serif", "Liberation Serif", serif; }
 .meaning { font-size: 24px; }
 .hint { color: #888888; font-size: 15px; }
 .count { font-size: 15px; }
-.dict-kana { font-size: 22px; font-family: "Noto Sans CJK JP", "Noto Sans JP", sans-serif; }
+.dict-kana { font-size: 24px; font-weight: 600; font-family: "Klee One", "Noto Sans CJK JP", "Noto Sans JP", sans-serif; }
 .dict-sub { color: #888888; }
 .dict-row { padding: 6px 4px; }
 """
@@ -704,6 +712,26 @@ class Dictionary(Gtk.Box):
                              f"{len(VOCAB)} with your study set")
 
 
+def ensure_font():
+    """Download the textbook kana font if it isn't there. It takes effect the
+    next time the app starts. Never raises."""
+    try:
+        if os.path.exists(FONT_FILE):
+            return
+        os.makedirs(FONT_DIR, exist_ok=True)
+        with urllib.request.urlopen(FONT_URL, timeout=60) as r:
+            data = r.read()
+        if not data.startswith(b"\x00\x01\x00\x00"):   # not a TrueType font
+            return
+        tmp = FONT_FILE + ".part"
+        with open(tmp, "wb") as f:
+            f.write(data)
+        os.replace(tmp, FONT_FILE)
+        os.system("fc-cache -f '%s' >/dev/null 2>&1" % FONT_DIR)
+    except Exception:
+        pass
+
+
 def fetch_update():
     """Return the newer app source from GitHub, or None (offline, same
     version, or anything odd). Never raises."""
@@ -782,6 +810,7 @@ class App(Gtk.ApplicationWindow):
 
     # ----- updates -----
     def check_update(self):
+        ensure_font()
         src = fetch_update()
         if src:
             GLib.idle_add(self.offer_update, src)
@@ -810,7 +839,8 @@ class App(Gtk.ApplicationWindow):
 
     # ----- card sources -----
     def kana_cards(self):
-        return [{"front": k, "front_class": "kana", "back": r,
+        return [{"front": k, "front_class": "kana",
+                 "back": ("*" + r) if r in IRREGULAR else r,
                  "back_class": "romaji"}
                 for name, cs in DECK if name in self.settings["groups"]
                 for k, r in cs]
@@ -945,5 +975,12 @@ Icon=accessories-dictionary
 Terminal=false
 Categories=Education;
 DEOF
+echo "Downloading the textbook-style kana font (Klee One)..."
+mkdir -p "$HOME/.local/share/fonts"
+if [ ! -f "$HOME/.local/share/fonts/KleeOne-SemiBold.ttf" ]; then
+  curl -fsSL https://raw.githubusercontent.com/google/fonts/main/ofl/kleeone/KleeOne-SemiBold.ttf \
+    -o "$HOME/.local/share/fonts/KleeOne-SemiBold.ttf" && fc-cache -f "$HOME/.local/share/fonts" >/dev/null 2>&1 \
+    || echo "(Couldn't download the font; the app will try again when it starts.)"
+fi
 echo "Installed. Opening Hiragana Flashcards..."
 nohup /usr/bin/python3 "$DIR/hiragana.py" >/dev/null 2>&1 &

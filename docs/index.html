@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Japanese Tutor</title>
+<meta name="description" content="Japanese practice with a Claude tutor, kana and vocab review, and progress tracking.">
+<meta name="theme-color" content="#c0392b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&family=Crimson+Pro:ital@1&family=Noto+Serif+JP&family=Noto+Sans+JP&family=Kosugi+Maru&family=Yomogi&family=Zen+Kurenaido&family=DotGothic16&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <nav id="tabs" role="tablist">
+    <button data-tab="tutor" class="on">Tutor</button>
+    <button data-tab="kana">Kana</button>
+    <button data-tab="vocab">Vocab</button>
+    <button data-tab="progress">Progress</button>
+    <button data-tab="settings">Settings</button>
+  </nav>
+</header>
+
+<main>
+  <!-- TUTOR -->
+  <section id="tutor" class="tab on">
+    <div class="bar">
+      <select id="mode" aria-label="Session type"></select>
+      <button id="newSession" class="ghost">New session</button>
+      <span class="spacer"></span>
+      <span id="spend" class="muted small" title="Estimated API spend"></span>
+    </div>
+    <div id="keyBanner" class="banner hidden">Add your Claude API key in <a href="#" data-goto="settings">Settings</a> to talk to the tutor.</div>
+    <div id="log" aria-live="polite"></div>
+    <div id="composer">
+      <div class="row">
+        <button id="mic" class="mic" title="Talk (Ctrl+M)" aria-label="Talk">🎤</button>
+        <textarea id="input" rows="1" placeholder="Type in English or Japanese, or press 🎤 and talk"></textarea>
+        <button id="sendBtn" class="primary">Send</button>
+        <button id="stopBtn" class="hidden">Stop</button>
+      </div>
+      <div class="row small toggles">
+        <label>I'm speaking
+          <select id="micLang"><option value="ja-JP">日本語</option><option value="en-US">English</option></select>
+        </label>
+        <label><input type="checkbox" id="speakReplies"> Read replies aloud</label>
+        <label title="After a reply is read aloud, start listening again automatically"><input type="checkbox" id="handsFree"> Hands-free</label>
+        <span id="voiceStatus" class="muted"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- KANA -->
+  <section id="kana" class="tab">
+    <div class="bar">
+      <button id="pickGroups" class="ghost">Choose kana…</button>
+      <button id="showChart" class="ghost">Chart</button>
+      <span id="kanaInfo" class="muted small"></span>
+    </div>
+    <div id="groupPicker" class="picker hidden"></div>
+    <div id="kanaChart" class="hidden"></div>
+    <div class="card">
+      <div id="kanaFront" class="kana-big"></div>
+      <div id="kanaRomaji" class="romaji-big"></div>
+      <div id="kanaFontName" class="fontname"></div>
+      <input id="kanaAnswer" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="type the romaji, then Enter">
+      <div id="kanaResult" class="result"></div>
+      <div class="row center">
+        <button id="kanaSay" class="ghost" title="Hear it">🔊</button>
+        <button id="kanaNext" class="primary hidden">Next (Enter)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- VOCAB -->
+  <section id="vocab" class="tab">
+    <div class="bar">
+      <select id="deck" aria-label="Deck">
+        <option value="core">Words I can read</option>
+        <option value="tutor">Words from the tutor</option>
+      </select>
+      <select id="direction" aria-label="Direction">
+        <option value="jp">Japanese → English</option>
+        <option value="en">English → Japanese</option>
+      </select>
+      <select id="topic" aria-label="Topic"></select>
+      <span id="vocabInfo" class="muted small"></span>
+    </div>
+    <div class="card">
+      <div id="vFront" class="word"></div>
+      <div id="vFontName" class="fontname"></div>
+      <div id="vBack" class="back hidden"></div>
+      <div class="row center">
+        <button id="vSay" class="ghost" title="Hear it">🔊</button>
+        <button id="vReveal" class="primary">Show answer (Space)</button>
+        <button id="vMiss" class="bad hidden">Missed it (←)</button>
+        <button id="vKnew" class="good hidden">Knew it (→)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROGRESS -->
+  <section id="progress" class="tab">
+    <div class="stats" id="stats"></div>
+    <h3>Last 14 days</h3>
+    <div id="days" class="days"></div>
+    <h3>Hiragana</h3>
+    <p class="muted small">Colour shows how well each kana is sticking in review: white not seen yet, red shaky, yellow learning, green solid. * marks readings that break the row's pattern.</p>
+    <div id="kanaGrid"></div>
+    <h3>Recent mistakes the tutor logged</h3>
+    <div id="mistakes" class="list"></div>
+    <h3>Tutor's notes about you</h3>
+    <div id="notes" class="notes"></div>
+    <h3>Backup</h3>
+    <p class="muted small">Progress is stored in this browser. Export a file to back it up or move it to another device. Your API key is never included.</p>
+    <div class="row">
+      <button id="exportBtn">Export progress</button>
+      <label class="button">Import progress<input type="file" id="importFile" accept=".json,application/json" hidden></label>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="settings" class="tab">
+    <h3>Claude API key</h3>
+    <p class="muted small">Create a key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> and add credit there (a Claude.ai subscription doesn't cover API use). Setting a monthly spend limit in the console is a good idea. The key is saved only in this browser on this computer and is sent only to Anthropic.</p>
+    <div class="row">
+      <input id="apiKey" type="password" autocomplete="off" placeholder="sk-ant-…" spellcheck="false">
+      <button id="showKey" class="ghost">Show</button>
+    </div>
+    <h3>Kana font</h3>
+    <label class="radio"><input type="radio" name="fontMode" value="textbook"> Textbook: the same clear style as a printed hiragana chart, always</label>
+    <label class="radio"><input type="radio" name="fontMode" value="variable"> Variable: each flashcard uses a different style (textbook, mincho, gothic, rounded, handwritten, brush, pixel) so you learn to read kana anywhere</label>
+    <div id="fontSamples" class="fontsamples"></div>
+    <h3>Tutor</h3>
+    <label class="field">Model <select id="model"></select></label>
+    <label class="field">Thinking effort
+      <select id="effort">
+        <option value="low">Low (fastest replies, good for conversation)</option>
+        <option value="medium">Medium</option>
+        <option value="high">High (slower, more careful explanations)</option>
+      </select>
+    </label>
+    <label class="field"><input type="checkbox" id="showRomaji"> Show romaji after Japanese</label>
+    <p class="muted small">Changes to these apply to the next new session.</p>
+    <h3>Voice</h3>
+    <label class="field">Japanese speaking speed <input type="range" id="jaRate" min="0.5" max="1.2" step="0.05"> <span id="jaRateVal"></span></label>
+    <div class="row"><button id="testVoice" class="ghost">Test Japanese voice</button><span id="voiceCheck" class="muted small"></span></div>
+    <h3>Daily goal</h3>
+    <label class="field">Minutes per day <input type="number" id="dailyGoal" min="5" max="240" step="5"></label>
+    <h3>About</h3>
+    <p class="muted small">On Linux, use Google Chrome: it has Japanese speech recognition and voices built in (Firefox and Chromium don't). In Chrome, use the install icon in the address bar to open this as its own app window. Version <span id="ver"></span>.</p>
+  </section>
+</main>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
