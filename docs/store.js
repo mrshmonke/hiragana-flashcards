@@ -20,12 +20,14 @@ function blank() {
       jaRate: 0.85,
       showRomaji: true,
       fontMode: "textbook", // "textbook" or "variable"
+      kanaMode: "type",     // "type" or "trip"
       studyGroups: ["Vowels", "K", "S"],
       dailyGoalMin: 30,
     },
     items: {},        // "kana:か" / "word:ねこ" -> {box, due, right, wrong, last}
     tutorWords: [],   // words the tutor taught: {kana, kanji, en, added}
     mistakes: [],     // {at, said, correction, explanation, category}
+    confusions: {},   // "さ|ち" (sorted pair) -> times mixed up in Trip Up
     notes: "",        // the tutor's running notes about the learner
     days: {},         // "2026-11-20" -> {sec, reviews, msgs}
     sessions: [],     // [{id, mode, started, messages:[...]}], newest last

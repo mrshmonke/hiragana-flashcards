@@ -124,6 +124,7 @@ function learnerSnapshot() {
     `Hiragana well known (from flashcard reviews): ${mastered.join("") || "none yet"}.`,
     `Hiragana still being learned: ${learning.join("") || "none"}.`,
     weak.length ? `Kana they often miss: ${weak.join(", ")}.` : "",
+    Object.keys(db.confusions || {}).length ? `Look-alike kana they mix up (Trip Up drill): ${Object.entries(db.confusions).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([p, n]) => `${p.replace("|", "/")} ${n}×`).join(", ")}.` : "",
     `Katakana: not studied yet.  Kanji: none yet.`,
     `Words solidly learned in review (${words.length}): ${words.slice(0, 80).join("、") || "none yet"}.`,
     recent ? `Recent mistakes:\n${recent}` : "No mistakes logged yet.",

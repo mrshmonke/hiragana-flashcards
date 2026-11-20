@@ -1,9 +1,9 @@
 import { db, save, saveNow, today, activity, streak, grade, pickNext, countDue, exportJSON, importJSON, MASTERED_BOX } from "./store.js";
-import { GROUPS, KANA, VOCAB, readable, romajiMatches } from "./kana.js";
+import { GROUPS, KANA, VOCAB, readable, romajiMatches, lookalikesIn } from "./kana.js";
 import { MODELS, MODES, newSession, send, costSoFar } from "./tutor.js";
 import * as voice from "./voice.js";
 
-const VERSION = "2";
+const VERSION = "3";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
 
@@ -14,7 +14,7 @@ function showTab(name) {
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.id === name));
   if (name === "progress") renderProgress();
-  if (name === "kana") { if (!kanaCur) nextKana(); setTimeout(() => $("kanaAnswer").focus(), 0); }
+  if (name === "kana") showKanaMode();
   if (name === "vocab" && !vCur) nextVocab();
   if (name === "tutor") refreshKeyBanner();
 }
@@ -59,11 +59,15 @@ const FONTS = [
   { name: "Pixel (game text)", family: '"DotGothic16"' },
 ];
 let lastFont = 0;
-function applyCardFont(el, labelEl) {
-  if (S.fontMode !== "variable") { el.style.fontFamily = ""; el.style.fontWeight = ""; labelEl.textContent = ""; return; }
+function randomFontIndex() {
   let i;
   do { i = Math.floor(Math.random() * FONTS.length); } while (i === lastFont && FONTS.length > 1);
   lastFont = i;
+  return i;
+}
+function applyCardFont(el, labelEl) {
+  if (S.fontMode !== "variable") { el.style.fontFamily = ""; el.style.fontWeight = ""; labelEl.textContent = ""; return; }
+  const i = randomFontIndex();
   el.style.fontFamily = `${FONTS[i].family}, var(--jp)`;
   el.style.fontWeight = i === 0 ? "" : "400"; // only the textbook font is loaded in a heavier weight
   labelEl.textContent = FONTS[i].name;
@@ -299,6 +303,88 @@ function checkKana() {
 }
 $("kanaAnswer").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); checkKana(); } });
 $("kanaNext").onclick = nextKana;
+
+/* ---------- Trip Up: drill look-alike kana within the study set ---------- */
+let trip = null;
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+function studySet() {
+  return new Set(GROUPS.filter((g) => S.studyGroups.includes(g.name)).flatMap((g) => g.cards.map(([k]) => k)));
+}
+function showKanaMode() {
+  const tripMode = S.kanaMode === "trip";
+  $("kanaMode").value = S.kanaMode;
+  $("tripCard").classList.toggle("hidden", !tripMode);
+  $("typeCard").classList.toggle("hidden", tripMode);
+  if (tripMode) { $("kanaInfo").textContent = ""; if (!trip) nextTrip(); }
+  else { if (!kanaCur) nextKana(); setTimeout(() => $("kanaAnswer").focus(), 0); }
+}
+$("kanaMode").onchange = () => { S.kanaMode = $("kanaMode").value; save(); trip = null; showKanaMode(); };
+
+function nextTrip() {
+  const set = studySet();
+  const ids = [...set].filter((k) => lookalikesIn(k, set).length).map((k) => "trip:" + k);
+  $("tripResult").textContent = ""; $("tripResult").className = "result";
+  $("tripNext").classList.add("hidden");
+  if (!ids.length) {
+    trip = null;
+    $("tripPrompt").innerHTML = "None of your selected kana look much alike yet. Add more rows with “Choose kana…” (T, N, H, M, R and W have lots of look-alikes) to unlock Trip Up.";
+    $("tripChoices").innerHTML = ""; $("tripInfo").textContent = ""; $("tripFontName").textContent = "";
+    return;
+  }
+  const id = pickNext(ids, trip && "trip:" + trip.target);
+  const target = id.slice(5);
+  const choices = shuffle([target, ...shuffle(lookalikesIn(target, set)).slice(0, 3)]);
+  trip = { target, choices, ask: Math.random() < 0.5 ? "kana" : "romaji", answered: false };
+  // Variable font mode: one random style for the whole question.
+  const card = $("tripCard");
+  if (S.fontMode === "variable") {
+    const i = randomFontIndex();
+    card.style.setProperty("--kana", `${FONTS[i].family}, var(--jp)`);
+    card.style.setProperty("--kana-weight", i === 0 ? "600" : "400");
+    $("tripFontName").textContent = FONTS[i].name;
+  } else {
+    card.style.removeProperty("--kana"); card.style.removeProperty("--kana-weight");
+    $("tripFontName").textContent = "";
+  }
+  const r = KANA[target].romaji;
+  $("tripPrompt").innerHTML = trip.ask === "kana"
+    ? `Which one is<span class="big romaji">${romajiHTML(r)}</span>`
+    : `What is this?<span class="big kana">${target}</span>`;
+  $("tripChoices").innerHTML = choices.map((k, n) => `<button class="choice" data-k="${k}">${
+    trip.ask === "kana" ? `<span class="k">${k}</span>` : `<span class="rm">${romajiHTML(KANA[k].romaji)}</span>`
+  }<span class="after"></span><span class="n">${n + 1}</span></button>`).join("");
+  $("tripInfo").textContent = `${ids.length} of your ${set.size} kana have a look-alike in your set · ${countDue(ids)} due`;
+}
+function answerTrip(k) {
+  if (!trip || trip.answered) return;
+  trip.answered = true;
+  const ok = k === trip.target;
+  grade("trip:" + trip.target, ok);
+  if (!ok) {
+    const pair = [trip.target, k].sort().join("|");
+    db.confusions[pair] = (db.confusions[pair] || 0) + 1;
+    save();
+  }
+  for (const b of $("tripChoices").children) {
+    const bk = b.dataset.k;
+    b.classList.toggle("right", bk === trip.target);
+    b.classList.toggle("wrong", bk === k && !ok);
+    // Reveal the other half of every option so the difference sinks in.
+    b.querySelector(".after").innerHTML = trip.ask === "kana" ? romajiHTML(KANA[bk].romaji) : `<span class="jp">${bk}</span>`;
+  }
+  const t = trip.target;
+  $("tripResult").innerHTML = ok ? "Correct" : `No. That's <span class="jp">${k}</span> (${KANA[k].romaji}). You wanted <span class="jp">${t}</span> (${KANA[t].romaji}).`;
+  $("tripResult").className = "result " + (ok ? "ok" : "no");
+  $("tripNext").classList.remove("hidden");
+  if (ok) { const cur = trip; setTimeout(() => { if (trip === cur) nextTrip(); }, 900); }
+}
+$("tripChoices").addEventListener("click", (e) => { const b = e.target.closest(".choice"); if (b) answerTrip(b.dataset.k); });
+$("tripNext").onclick = nextTrip;
+document.addEventListener("keydown", (e) => {
+  if (currentTab !== "kana" || S.kanaMode !== "trip" || e.target.matches("input, textarea, select")) return;
+  if (/^[1-4]$/.test(e.key) && trip && !trip.answered) { const k = trip.choices[+e.key - 1]; if (k) answerTrip(k); }
+  else if (e.key === "Enter" && trip?.answered) { e.preventDefault(); nextTrip(); }
+});
 $("kanaSay").onclick = () => kanaCur && voice.speak(kanaCur.slice(5), { jaRate: S.jaRate });
 
 function renderPicker() {
@@ -312,7 +398,7 @@ function renderPicker() {
       const on = S.studyGroups.includes(g.name);
       if (on && S.studyGroups.length === 1) return;
       S.studyGroups = on ? S.studyGroups.filter((n) => n !== g.name) : [...S.studyGroups, g.name];
-      save(); renderPicker(); nextKana(); vCur = null;
+      save(); renderPicker(); vCur = null; kanaCur = null; trip = null; showKanaMode();
       if (!$("kanaChart").classList.contains("hidden")) $("kanaChart").innerHTML = chartHTML(S.studyGroups, false);
     };
     p.appendChild(c);
@@ -407,6 +493,11 @@ function renderProgress() {
   }
   $("days").innerHTML = days.join("");
   $("kanaGrid").innerHTML = chartHTML(GROUPS.map((g) => g.name), true);
+  const conf = Object.entries(db.confusions || {}).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  $("confusions").innerHTML = conf.map(([pair, n]) => {
+    const [a, b] = pair.split("|");
+    return `<div class="m"><span class="jp">${a}</span> <i class="romaji small">${KANA[a]?.romaji || ""}</i> ⇄ <span class="jp">${b}</span> <i class="romaji small">${KANA[b]?.romaji || ""}</i> <span class="muted small">· mixed up ${n}×</span></div>`;
+  }).join("") || '<p class="muted">None yet. Try Trip Up in the Kana tab.</p>';
   $("mistakes").innerHTML = db.mistakes.slice(-25).reverse().map((m) =>
     `<div class="m"><span class="jp">${esc(m.said)}</span> → <span class="c jp">${esc(m.correction)}</span><div class="muted small">${esc(m.category)} · ${esc(m.explanation)} · ${new Date(m.at).toLocaleDateString()}</div></div>`
   ).join("") || '<p class="muted">None yet. The tutor logs mistakes as you talk to it.</p>';
@@ -445,7 +536,7 @@ $("effort").onchange = () => { S.effort = $("effort").value; save(); };
 $("showRomaji").onchange = () => { S.showRomaji = $("showRomaji").checked; save(); };
 document.querySelectorAll('input[name="fontMode"]').forEach((r) => {
   r.checked = r.value === S.fontMode;
-  r.onchange = () => { S.fontMode = r.value; save(); kanaCur = null; vCur = null; };
+  r.onchange = () => { S.fontMode = r.value; save(); kanaCur = null; vCur = null; trip = null; };
 });
 $("fontSamples").innerHTML = FONTS.map((f) => `<span><b style="font-family:${f.family.replace(/"/g, "'")}">あきさ</b>${esc(f.name.split(" (")[0])}</span>`).join("");
 $("jaRate").oninput = () => { S.jaRate = +$("jaRate").value; $("jaRateVal").textContent = S.jaRate + "×"; save(); };
