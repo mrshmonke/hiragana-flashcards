@@ -18,6 +18,8 @@ function blank() {
       handsFree: false,
       micLang: "ja-JP",
       jaRate: 0.85,
+      sttModel: "small",    // Whisper size used by the voice helper
+      readAloud: "all",     // "all" or "ja" (Japanese parts only)
       showRomaji: true,
       fontMode: "textbook", // "textbook" or "variable"
       kanaMode: "type",     // "type" or "trip"

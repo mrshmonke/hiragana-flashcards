@@ -1,0 +1,4 @@
+Fonts in this folder are subsets of fonts from https://github.com/google/fonts
+(downloaded from GitHub, not served by Google Fonts).
+- Klee One, Noto Serif JP, Noto Sans JP, Yomogi, Zen Kurenaido, DotGothic16, Crimson Pro: SIL Open Font License 1.1
+- Kosugi Maru: Apache License 2.0

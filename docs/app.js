@@ -3,7 +3,7 @@ import { GROUPS, KANA, VOCAB, readable, romajiMatches, lookalikesIn } from "./ka
 import { MODELS, MODES, newSession, send, costSoFar } from "./tutor.js";
 import * as voice from "./voice.js";
 
-const VERSION = "4";
+const VERSION = "5";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
 
@@ -16,6 +16,7 @@ function showTab(name) {
   if (name === "progress") renderProgress();
   if (name === "kana") showKanaMode();
   if (name === "vocab" && !vCur) nextVocab();
+  if (name === "dict") { renderDict(); setTimeout(() => $("dictSearch").focus(), 0); }
   if (name === "tutor") refreshKeyBanner();
 }
 $("tabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) showTab(b.dataset.tab); });
@@ -130,7 +131,7 @@ function setMsg(d, text, speakable) {
 }
 log.addEventListener("click", (e) => {
   const b = e.target.closest(".say");
-  if (b) voice.speak(b.parentElement.dataset.text, { jaRate: S.jaRate });
+  if (b) voice.speak(b.parentElement.dataset.text, speakOpts());
 });
 
 function renderSession() {
@@ -139,7 +140,7 @@ function renderSession() {
   addMsg("note", `${MODES[session.mode]?.label || "Session"} · ${new Date(session.started).toLocaleString()}`);
   // One bubble per reply, even when a reply spanned several tool-use rounds.
   let reply = "";
-  const flush = () => { if (reply.trim()) addMsg("them", reply, { speakable: voice.canSpeak }); reply = ""; };
+  const flush = () => { if (reply.trim()) addMsg("them", reply, { speakable: voice.canSpeak() }); reply = ""; };
   for (const m of session.messages) {
     if (m.role === "user" && typeof m.content === "string") {
       flush();
@@ -179,12 +180,12 @@ async function talk(userText, { spoken = false, hidden = false } = {}) {
       onText: (t) => { setMsg(bubble, t, false); bubble.classList.add("typing"); log.scrollTop = log.scrollHeight; },
     });
     bubble.classList.remove("typing");
-    setMsg(bubble, reply || "_(no reply)_", voice.canSpeak);
+    setMsg(bubble, reply || "_(no reply)_", voice.canSpeak());
     activity("msg");
     setBusy(false);
     if (S.speakReplies && reply) {
       $("voiceStatus").textContent = "Speaking…";
-      await voice.speak(reply, { jaRate: S.jaRate });
+      await voice.speak(reply, speakOpts());
       $("voiceStatus").textContent = "";
       if (S.handsFree && currentTab === "tutor" && !busy) startListening();
     }
@@ -226,7 +227,9 @@ async function startListening() {
   $("mic").classList.add("listening");
   $("voiceStatus").textContent = S.micLang === "ja-JP" ? "Listening (日本語)…" : "Listening (English)…";
   try {
-    const text = await voice.listen(S.micLang, (t) => { $("input").value = t; autoGrow(); });
+    const text = await voice.listen(S.micLang, (t, live) => {
+      if (live) { $("input").value = t; autoGrow(); } else $("voiceStatus").textContent = t;
+    }, { model: S.sttModel });
     $("input").value = ""; autoGrow();
     $("voiceStatus").textContent = "";
     if (text) talk(text, { spoken: true });
@@ -243,10 +246,41 @@ $("mic").onclick = startListening;
 document.addEventListener("keydown", (e) => {
   if (e.ctrlKey && e.key.toLowerCase() === "m" && currentTab === "tutor") { e.preventDefault(); startListening(); }
 });
-if (!voice.canListen) {
-  $("mic").disabled = true;
-  $("mic").title = "Speech recognition needs Google Chrome";
+function speakOpts() { return { jaRate: S.jaRate, onlyJapanese: S.readAloud === "ja" }; }
+
+// Find the offline voice helper (or browser speech) and update the UI.
+let setupPolls = 0; // keeps checking while the helper restarts after installing voice
+async function refreshVoice() {
+  $("voiceHelperStatus").textContent = "Checking…";
+  const h = await voice.detect();
+  const ok = voice.canListen();
+  $("mic").disabled = !ok;
+  $("mic").title = ok ? "Talk (Ctrl+M)" : "Voice input needs the free voice helper (see Settings)";
+  if (setupPolls > 0 && (!h || !h.stt) && h?.setup?.state !== "failed") {
+    setupPolls--;
+    if (!h || h.setup?.state === "idle") { $("voiceHelperStatus").textContent = "Installing voice: restarting…"; setTimeout(refreshVoice, 2000); return; }
+  }
+  if (h?.stt) setupPolls = 0;
+  $("voiceSetupRow").classList.toggle("hidden", !(h && !h.stt && h.setup?.state !== "running"));
+  if (h?.setup?.state === "running" || h?.setup?.state === "restarting") {
+    $("voiceHelperStatus").textContent = `Installing voice: ${h.setup.step}…`;
+    setTimeout(refreshVoice, 2000);
+    return;
+  }
+  if (h?.setup?.state === "failed") {
+    $("voiceHelperStatus").textContent = h.setup.error;
+    return;
+  }
+  if (h) {
+    const parts = [h.stt ? "speech recognition ✓" : "speech recognition ✗", h.tts_ja ? "Japanese voice ✓" : "Japanese voice ✗", h.tts_en ? "English voice ✓" : "English voice: browser"];
+    $("voiceHelperStatus").textContent = `Voice helper running: ${parts.join(" · ")}${h.loading ? ` · loading ${h.loading}…` : ""}`;
+  } else {
+    $("voiceHelperStatus").textContent = voice.canListen()
+      ? "Voice helper not running. Using this browser's built-in speech instead."
+      : "Voice helper not running, so voice input is off. Install it with the command in the README, or start it with: systemctl --user start japanese-tutor-voice";
+  }
 }
+refreshVoice();
 
 function bindToggle(id, key) {
   const el = $(id);
@@ -479,6 +513,26 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "ArrowLeft" || e.key === "2") answerVocab(false);
 });
 
+/* ---------- dictionary ---------- */
+function renderDict() {
+  const q = $("dictSearch").value.trim().toLowerCase();
+  const norm = (x) => x.toLowerCase().replace(/[\s'-]/g, "");
+  const onlyReadable = $("dictReadable").checked;
+  const rows = VOCAB.filter((w) => {
+    if (onlyReadable && !readable(w, S.studyGroups)) return false;
+    if (!q) return true;
+    return w.kana.includes(q) || (w.kanji && w.kanji.includes(q)) || norm(w.romaji).includes(norm(q)) || w.en.toLowerCase().includes(q);
+  });
+  const can = VOCAB.filter((w) => readable(w, S.studyGroups)).length;
+  $("dictStatus").textContent = `${rows.length} words shown · you can read ${can} of ${VOCAB.length} with the kana you've picked`;
+  $("dictList").innerHTML = rows.slice(0, 400).map((w) =>
+    `<div class="drow${readable(w, S.studyGroups) ? "" : " locked"}"><span class="jp">${esc(w.kana)}</span><span class="romaji">${esc(w.romaji)}</span><span class="en">${esc(w.en)}${w.kanji ? ` <span class="jp meta">${esc(w.kanji)}</span>` : ""}</span><span class="meta">${esc(w.topic)}</span><button data-say="${esc(w.kana)}" title="Hear it">🔊</button></div>`
+  ).join("");
+}
+$("dictSearch").addEventListener("input", renderDict);
+$("dictReadable").onchange = renderDict;
+$("dictList").addEventListener("click", (e) => { const b = e.target.closest("[data-say]"); if (b) voice.speak(b.dataset.say, speakOpts()); });
+
 /* ---------- progress ---------- */
 function renderProgress() {
   const kanaAll = GROUPS.flatMap((g) => g.cards.map(([k]) => k));
@@ -550,8 +604,19 @@ document.querySelectorAll('input[name="fontMode"]').forEach((r) => {
 $("fontSamples").innerHTML = FONTS.map((f) => `<span><b style="font-family:${f.family.replace(/"/g, "'")}">あきさ</b>${esc(f.name.split(" (")[0])}</span>`).join("");
 $("jaRate").oninput = () => { S.jaRate = +$("jaRate").value; $("jaRateVal").textContent = S.jaRate + "×"; save(); };
 $("dailyGoal").onchange = () => { S.dailyGoalMin = Math.max(5, +$("dailyGoal").value || 30); save(); };
+$("checkVoice").onclick = refreshVoice;
+$("voiceSetup").onclick = async () => {
+  $("voiceSetupRow").classList.add("hidden");
+  setupPolls = 600;
+  try { await voice.startSetup(S.sttModel); } catch {}
+  setTimeout(refreshVoice, 500);
+};
+$("sttModel").value = S.sttModel;
+$("sttModel").onchange = () => { S.sttModel = $("sttModel").value; save(); };
+$("readAloud").value = S.readAloud;
+$("readAloud").onchange = () => { S.readAloud = $("readAloud").value; save(); };
 $("testVoice").onclick = () => {
-  $("voiceCheck").textContent = voice.hasJapaneseVoice() ? "" : "No Japanese voice found. Google Chrome includes one.";
+  $("voiceCheck").textContent = voice.hasJapaneseVoice() ? "" : "No Japanese voice found. Install the voice helper (see the README).";
   voice.speak("こんにちは。にほんごの れんしゅうを しましょう。", { jaRate: S.jaRate });
 };
 

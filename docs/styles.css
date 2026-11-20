@@ -133,3 +133,15 @@ input[type=password], #apiKey { flex: 1; min-width: 0; }
 .choice.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 15%, var(--panel)); }
 .choice .after { font-family: var(--romaji); font-style: italic; font-size: 16px; color: var(--muted); min-height: 20px; }
 .list .romaji.small { font-size: 15px; }
+
+/* Dictionary */
+#dict.on { display: flex; }
+#dictSearch { flex: 1; min-width: 200px; }
+.dict { flex: 1; min-height: 0; overflow-y: auto; margin-top: 8px; }
+.drow { display: flex; gap: 12px; align-items: baseline; padding: 8px 4px; border-bottom: 1px solid var(--line); }
+.drow .jp { font-size: 24px; font-weight: 600; min-width: 5em; }
+.drow .romaji { font-size: 17px; min-width: 6em; }
+.drow .en { flex: 1; }
+.drow .meta { font-size: 12px; color: var(--muted); }
+.drow.locked { opacity: .55; }
+.drow button { padding: 2px 8px; border: 0; background: none; }

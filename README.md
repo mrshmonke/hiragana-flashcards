@@ -2,34 +2,29 @@
 
 Two apps live here.
 
-## Japanese Tutor (web app, Linux first)
+## Japanese Tutor (Linux app)
 
-A Claude-powered Japanese tutor you can talk to, plus kana and vocab review and progress tracking. It's in [`docs/`](docs/) and is served at https://mrshmonke.github.io/hiragana-flashcards/.
+One window with a Claude tutor you can talk to, plus kana and vocab review, a dictionary, and progress tracking. Nothing comes from Google. Voice is free and runs offline on your computer.
 
-- **Tutor**: conversation, Okinawa role-play, kana/vocab drills, anime line breakdowns, or ask anything. Press 🎤 (or Ctrl+M) and speak Japanese or English; replies are read aloud. The tutor corrects mistakes plainly and doesn't flatter. It logs your mistakes and new words to your progress and keeps notes on your level for future sessions.
-- **Kana**: type the romaji for each hiragana. Spaced repetition decides what comes back and when. **Trip Up** mode drills only the look-alike kana inside your selected set (あ/お, さ/き/ち, ね/れ/わ, は/ほ, ば/ぱ…) as quick multiple choice, and tracks which pairs you mix up.
-- **Vocab**: ~320 words, limited to the kana you've picked, plus words the tutor taught you.
-- **Kana font**: Textbook mode shows kana like a printed hiragana chart, with italic romaji. Variable mode gives each flashcard a different style (mincho, gothic, rounded, handwritten, brush, pixel) so you learn to read kana anywhere.
-- **Progress**: streak, daily minutes, which kana are solid, logged mistakes, tutor notes, estimated API spend, and export/import.
-
-Needs **Google Chrome** on Linux (Chromium and Firefox lack working speech recognition) and your own Claude API key from [console.anthropic.com](https://console.anthropic.com/settings/keys), entered in Settings. The key and your progress stay in that browser.
-
-Add it to your app launcher (no sudo):
-
-    curl -fsSL https://raw.githubusercontent.com/mrshmonke/hiragana-flashcards/main/install-tutor.sh | bash
-
-Or open the URL in Chrome and use the install icon in the address bar.
-
-To run locally: `cd docs && python3 -m http.server 8000`, then open http://localhost:8000.
-
-`docs/data.js` is generated from the word list in `hiragana.py`. `docs/vendor/` holds a browser bundle of the official Anthropic TypeScript SDK (v1.11.0).
-
-## Hiragana Flashcards (GTK desktop app)
-
-A small GTK app for Ubuntu: kana flashcards, vocab flashcards limited to the kana you've studied, and a beginner dictionary.
-
-Install (no sudo):
+Install or update (no sudo):
 
     curl -fsSL https://raw.githubusercontent.com/mrshmonke/hiragana-flashcards/main/install.sh | bash
 
-The app checks this repo at launch and shows an "Update ready" button when `APP_VERSION` in `hiragana.py` goes up.
+Then open **Japanese Tutor** from the app launcher. If the installer says so, run `sudo apt install gir1.2-webkit2-4.1` once (it's the component the window is drawn with). Paste your own Claude API key from [console.anthropic.com](https://console.anthropic.com/settings/keys) into Settings.
+
+- **Tutor**: conversation, Okinawa role-play, drills, anime line breakdowns, or ask anything. Press 🎤 (or Ctrl+M) and talk in Japanese or English; it stops listening when you pause, and reads replies aloud. It corrects mistakes plainly and doesn't flatter. It logs mistakes and new words and keeps notes on your level.
+- **Kana**: type the romaji, or **Trip Up** mode for look-alike kana in your set. Always shuffled.
+- **Vocab**, **Dictionary**, **Progress** (streak, minutes, kana chart, mix-ups, mistakes, API spend, export/import).
+- **Kana font**: Textbook (like a printed chart) or Variable (rotating styles).
+
+### How it's built
+
+- `hiragana.py` is the app: a GTK window with a WebKitGTK view. It falls back to the original GTK flashcards if WebKitGTK isn't installed. It updates itself from this repo (bump `APP_VERSION`); the UI and helper files are re-downloaded when the version changes.
+- `docs/` is the UI (plain HTML/JS). It talks to Claude directly with your key (official Anthropic TypeScript SDK, vendored in `docs/vendor/`). Fonts are bundled in `docs/fonts/`.
+- `voice-helper/jp_voice.py` runs only while the app is open, on 127.0.0.1:8770. It serves the UI and does speech: [faster-whisper](https://github.com/SYSTRAN/faster-whisper) to hear you (model chosen in Settings: tiny/base for weak machines up to large-v3-turbo), Open JTalk (pyopenjtalk) for the Japanese voice, and Piper for English. It records from the microphone itself (parecord, arecord or pw-record).
+- `voice-helper/setup-voice.sh` installs the voice parts into `~/.local/share/japanese-tutor/venv` using [uv](https://github.com/astral-sh/uv). About 1 GB on disk plus the Whisper model.
+- To work on the UI in a browser: `cd docs && python3 -m http.server 8000`, and run `python3 voice-helper/jp_voice.py` for voice.
+
+## Original flashcards (fallback)
+
+If WebKitGTK isn't installed, `hiragana.py` opens the original GTK flashcards (Kana, Vocab, Dictionary) instead, with a note on how to get the tutor window.
