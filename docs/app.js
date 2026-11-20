@@ -3,7 +3,7 @@ import { GROUPS, KANA, VOCAB, readable, romajiMatches, lookalikesIn } from "./ka
 import { MODELS, MODES, newSession, send, costSoFar } from "./tutor.js";
 import * as voice from "./voice.js";
 
-const VERSION = "3";
+const VERSION = "4";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
 
@@ -331,10 +331,19 @@ function nextTrip() {
     $("tripChoices").innerHTML = ""; $("tripInfo").textContent = ""; $("tripFontName").textContent = "";
     return;
   }
-  const id = pickNext(ids, trip && "trip:" + trip.target);
+  // Skip the previous question's whole look-alike group so pairs don't come back to back.
+  const id = pickNext(ids, trip ? trip.choices.map((k) => "trip:" + k) : []);
   const target = id.slice(5);
-  const choices = shuffle([target, ...shuffle(lookalikesIn(target, set)).slice(0, 3)]);
-  trip = { target, choices, ask: Math.random() < 0.5 ? "kana" : "romaji", answered: false };
+  // Shuffle answer positions, and never reuse the previous question's order.
+  let choices;
+  for (let n = 0; n < 6; n++) {
+    choices = shuffle([target, ...shuffle(lookalikesIn(target, set)).slice(0, 3)]);
+    if (!trip || choices.join("") !== trip.choices.join("") || choices.length < 2) break;
+  }
+  // Mix the question direction, but not the same direction three times running.
+  let ask = Math.random() < 0.5 ? "kana" : "romaji";
+  if (trip && trip.ask === ask && trip.prevAsk === ask) ask = ask === "kana" ? "romaji" : "kana";
+  trip = { target, choices, ask, prevAsk: trip?.ask, answered: false };
   // Variable font mode: one random style for the whole question.
   const card = $("tripCard");
   if (S.fontMode === "variable") {
