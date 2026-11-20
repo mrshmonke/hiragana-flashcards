@@ -1,0 +1,14 @@
+{
+  "name": "Japanese Tutor",
+  "short_name": "Japanese",
+  "description": "Japanese practice with a Claude tutor, kana and vocab review, and progress tracking.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fbfaf8",
+  "theme_color": "#c0392b",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
