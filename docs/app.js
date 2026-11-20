@@ -3,7 +3,7 @@ import { GROUPS, KANA, VOCAB, readable, romajiMatches } from "./kana.js";
 import { MODELS, MODES, newSession, send, costSoFar } from "./tutor.js";
 import * as voice from "./voice.js";
 
-const VERSION = "1";
+const VERSION = "2";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
 
@@ -44,6 +44,64 @@ function md(text) {
   }
   if (list) out.push(`<ul>${list.join("")}</ul>`);
   return out.join("");
+}
+
+/* ---------- kana fonts ---------- */
+// Textbook mode always uses the chart-style font. Variable mode gives each
+// flashcard a different style, so kana stay readable in menus, signs, manga...
+const FONTS = [
+  { name: "Textbook", family: '"Klee One"' },
+  { name: "Mincho (serif, books and signs)", family: '"Noto Serif JP"' },
+  { name: "Gothic (sans, screens and menus)", family: '"Noto Sans JP"' },
+  { name: "Rounded", family: '"Kosugi Maru"' },
+  { name: "Handwritten", family: '"Yomogi"' },
+  { name: "Brush pen", family: '"Zen Kurenaido"' },
+  { name: "Pixel (game text)", family: '"DotGothic16"' },
+];
+let lastFont = 0;
+function applyCardFont(el, labelEl) {
+  if (S.fontMode !== "variable") { el.style.fontFamily = ""; el.style.fontWeight = ""; labelEl.textContent = ""; return; }
+  let i;
+  do { i = Math.floor(Math.random() * FONTS.length); } while (i === lastFont && FONTS.length > 1);
+  lastFont = i;
+  el.style.fontFamily = `${FONTS[i].family}, var(--jp)`;
+  el.style.fontWeight = i === 0 ? "" : "400"; // only the textbook font is loaded in a heavier weight
+  labelEl.textContent = FONTS[i].name;
+}
+
+/* ---------- hiragana chart ---------- */
+// Readings that break their row's pattern get an asterisk, like a textbook chart.
+const IRREGULAR = new Set(["shi", "chi", "tsu"]);
+const romajiHTML = (r) => (IRREGULAR.has(r) ? `<sup>*</sup>${r}` : esc(r));
+// Place each row's kana in its column (a i u e o), leaving gaps like a real chart.
+const COLS = { a: 0, i: 1, u: 2, e: 3, o: 4 };
+function chartHTML(groupNames, withMastery) {
+  const cell = (k, r) => {
+    let cls = "";
+    if (withMastery) {
+      const it = db.items["kana:" + k];
+      cls = !it ? "" : it.box >= MASTERED_BOX ? "b4" : it.box >= 2 ? "b2" : "b1";
+    }
+    const tip = withMastery && db.items["kana:" + k] ? ` title="${db.items["kana:" + k].right}✓ ${db.items["kana:" + k].wrong}✗"` : "";
+    return `<div class="cell ${cls}"${tip}><span class="k">${k}</span><span class="r">${romajiHTML(r)}</span></div>`;
+  };
+  const blank = '<div class="cell"></div>';
+  const basic = [], combo = [];
+  for (const g of GROUPS.filter((x) => groupNames.includes(x.name))) {
+    if (g.name.startsWith("Combos")) { for (const [k, r] of g.cards) combo.push(cell(k, r)); continue; }
+    if (g.cards.length === 5) { basic.push(...g.cards.map(([k, r]) => cell(k, r))); continue; }
+    // Short rows (Y, W + n): put kana under their vowel column.
+    const row = [blank, blank, blank, blank, blank];
+    const extra = [];
+    for (const [k, r] of g.cards) {
+      if (r === "n") { extra.push(cell(k, r)); continue; }
+      row[COLS[r.at(-1)]] = cell(k, r);
+    }
+    basic.push(...row);
+    if (extra.length) basic.push(...extra, blank, blank, blank, blank);
+  }
+  return (basic.length ? `<div class="chart">${basic.join("")}</div>` : "")
+    + (combo.length ? `<div class="chart-title">Combinations</div><div class="chart combo">${combo.join("")}</div>` : "");
 }
 
 /* ---------- tutor ---------- */
@@ -214,6 +272,8 @@ function nextKana() {
   kanaChecked = false;
   const k = kanaCur?.slice(5) || "";
   $("kanaFront").textContent = k;
+  applyCardFont($("kanaFront"), $("kanaFontName"));
+  $("kanaRomaji").innerHTML = "";
   $("kanaAnswer").value = "";
   $("kanaAnswer").disabled = false;
   $("kanaResult").textContent = "";
@@ -231,7 +291,8 @@ function checkKana() {
   const ok = romajiMatches(ans, r);
   grade(kanaCur, ok);
   kanaChecked = true;
-  $("kanaResult").textContent = ok ? `Correct: ${r}` : `No — ${k} is “${r}” (you typed “${ans.trim()}”)`;
+  $("kanaRomaji").innerHTML = romajiHTML(r);
+  $("kanaResult").textContent = ok ? "Correct" : `No, you typed “${ans.trim()}”`;
   $("kanaResult").className = "result " + (ok ? "ok" : "no");
   $("kanaNext").classList.remove("hidden");
   if (ok) setTimeout(() => { if (kanaChecked && $("kanaFront").textContent === k) nextKana(); }, 700);
@@ -246,17 +307,24 @@ function renderPicker() {
   for (const g of GROUPS) {
     const c = document.createElement("span");
     c.className = "chip" + (S.studyGroups.includes(g.name) ? " on" : "");
-    c.textContent = `${g.name} ${g.cards.map((x) => x[0]).join("")}`;
+    c.innerHTML = `${esc(g.name)} <span class="jp">${g.cards.map((x) => x[0]).join("")}</span>`;
     c.onclick = () => {
       const on = S.studyGroups.includes(g.name);
       if (on && S.studyGroups.length === 1) return;
       S.studyGroups = on ? S.studyGroups.filter((n) => n !== g.name) : [...S.studyGroups, g.name];
       save(); renderPicker(); nextKana(); vCur = null;
+      if (!$("kanaChart").classList.contains("hidden")) $("kanaChart").innerHTML = chartHTML(S.studyGroups, false);
     };
     p.appendChild(c);
   }
 }
 $("pickGroups").onclick = () => { $("groupPicker").classList.toggle("hidden"); renderPicker(); };
+$("showChart").onclick = () => {
+  const c = $("kanaChart");
+  c.classList.toggle("hidden");
+  c.innerHTML = chartHTML(S.studyGroups, false);
+  $("showChart").textContent = c.classList.contains("hidden") ? "Chart" : "Hide chart";
+};
 
 /* ---------- vocab ---------- */
 let vCur = null, vRevealed = false;
@@ -279,6 +347,7 @@ function nextVocab() {
   if (!ids.length) {
     vCur = null;
     $("vFront").className = "word en";
+    $("vFront").style.fontFamily = ""; $("vFontName").textContent = "";
     $("vFront").textContent = $("deck").value === "tutor" ? "No tutor words yet. They appear here as the tutor teaches you." : "No words use only the kana you've picked yet. Add more kana groups in the Kana tab.";
     $("vReveal").classList.add("hidden");
     return;
@@ -288,6 +357,8 @@ function nextVocab() {
   const jp = $("direction").value === "jp";
   $("vFront").className = jp ? "word" : "word en";
   $("vFront").textContent = jp ? vCur.kana : vCur.en;
+  if (jp) applyCardFont($("vFront"), $("vFontName"));
+  else { $("vFront").style.fontFamily = ""; $("vFontName").textContent = ""; }
 }
 function revealVocab() {
   if (!vCur || vRevealed) return;
@@ -335,11 +406,7 @@ function renderProgress() {
     days.push(`<div class="day${m >= S.dailyGoalMin ? " goal" : ""}" title="${Math.round(m)} min"><i style="height:${(m / max) * 100}%"></i>${new Date(t).getDate()}</div>`);
   }
   $("days").innerHTML = days.join("");
-  $("kanaGrid").innerHTML = kanaAll.map((k) => {
-    const it = db.items["kana:" + k];
-    const cls = !it ? "" : it.box >= MASTERED_BOX ? "b4" : it.box >= 2 ? "b2" : "b1";
-    return `<div class="kcell ${cls}" title="${KANA[k].romaji}${it ? ` · ${it.right}✓ ${it.wrong}✗` : ""}">${k}</div>`;
-  }).join("");
+  $("kanaGrid").innerHTML = chartHTML(GROUPS.map((g) => g.name), true);
   $("mistakes").innerHTML = db.mistakes.slice(-25).reverse().map((m) =>
     `<div class="m"><span class="jp">${esc(m.said)}</span> → <span class="c jp">${esc(m.correction)}</span><div class="muted small">${esc(m.category)} · ${esc(m.explanation)} · ${new Date(m.at).toLocaleDateString()}</div></div>`
   ).join("") || '<p class="muted">None yet. The tutor logs mistakes as you talk to it.</p>';
@@ -376,6 +443,11 @@ $("showKey").onclick = () => { const k = $("apiKey"); k.type = k.type === "passw
 $("model").onchange = () => { S.model = $("model").value; save(); };
 $("effort").onchange = () => { S.effort = $("effort").value; save(); };
 $("showRomaji").onchange = () => { S.showRomaji = $("showRomaji").checked; save(); };
+document.querySelectorAll('input[name="fontMode"]').forEach((r) => {
+  r.checked = r.value === S.fontMode;
+  r.onchange = () => { S.fontMode = r.value; save(); kanaCur = null; vCur = null; };
+});
+$("fontSamples").innerHTML = FONTS.map((f) => `<span><b style="font-family:${f.family.replace(/"/g, "'")}">あきさ</b>${esc(f.name.split(" (")[0])}</span>`).join("");
 $("jaRate").oninput = () => { S.jaRate = +$("jaRate").value; $("jaRateVal").textContent = S.jaRate + "×"; save(); };
 $("dailyGoal").onchange = () => { S.dailyGoalMin = Math.max(5, +$("dailyGoal").value || 30); save(); };
 $("testVoice").onclick = () => {

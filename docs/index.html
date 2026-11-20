@@ -9,6 +9,9 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&family=Crimson+Pro:ital@1&family=Noto+Serif+JP&family=Noto+Sans+JP&family=Kosugi+Maru&family=Yomogi&family=Zen+Kurenaido&family=DotGothic16&display=swap">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -55,11 +58,15 @@
   <section id="kana" class="tab">
     <div class="bar">
       <button id="pickGroups" class="ghost">Choose kana…</button>
+      <button id="showChart" class="ghost">Chart</button>
       <span id="kanaInfo" class="muted small"></span>
     </div>
     <div id="groupPicker" class="picker hidden"></div>
+    <div id="kanaChart" class="hidden"></div>
     <div class="card">
       <div id="kanaFront" class="kana-big"></div>
+      <div id="kanaRomaji" class="romaji-big"></div>
+      <div id="kanaFontName" class="fontname"></div>
       <input id="kanaAnswer" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="type the romaji, then Enter">
       <div id="kanaResult" class="result"></div>
       <div class="row center">
@@ -85,6 +92,7 @@
     </div>
     <div class="card">
       <div id="vFront" class="word"></div>
+      <div id="vFontName" class="fontname"></div>
       <div id="vBack" class="back hidden"></div>
       <div class="row center">
         <button id="vSay" class="ghost" title="Hear it">🔊</button>
@@ -101,8 +109,8 @@
     <h3>Last 14 days</h3>
     <div id="days" class="days"></div>
     <h3>Hiragana</h3>
-    <p class="muted small">Colour shows how well each kana is sticking in review: grey not seen, red shaky, yellow learning, green solid.</p>
-    <div id="kanaGrid" class="kgrid"></div>
+    <p class="muted small">Colour shows how well each kana is sticking in review: white not seen yet, red shaky, yellow learning, green solid. * marks readings that break the row's pattern.</p>
+    <div id="kanaGrid"></div>
     <h3>Recent mistakes the tutor logged</h3>
     <div id="mistakes" class="list"></div>
     <h3>Tutor's notes about you</h3>
@@ -123,6 +131,10 @@
       <input id="apiKey" type="password" autocomplete="off" placeholder="sk-ant-…" spellcheck="false">
       <button id="showKey" class="ghost">Show</button>
     </div>
+    <h3>Kana font</h3>
+    <label class="radio"><input type="radio" name="fontMode" value="textbook"> Textbook: the same clear style as a printed hiragana chart, always</label>
+    <label class="radio"><input type="radio" name="fontMode" value="variable"> Variable: each flashcard uses a different style (textbook, mincho, gothic, rounded, handwritten, brush, pixel) so you learn to read kana anywhere</label>
+    <div id="fontSamples" class="fontsamples"></div>
     <h3>Tutor</h3>
     <label class="field">Model <select id="model"></select></label>
     <label class="field">Thinking effort

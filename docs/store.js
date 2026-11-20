@@ -19,6 +19,7 @@ function blank() {
       micLang: "ja-JP",
       jaRate: 0.85,
       showRomaji: true,
+      fontMode: "textbook", // "textbook" or "variable"
       studyGroups: ["Vowels", "K", "S"],
       dailyGoalMin: 30,
     },
