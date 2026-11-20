@@ -20,12 +20,14 @@ function blank() {
       jaRate: 0.85,
       showRomaji: true,
       fontMode: "textbook", // "textbook" or "variable"
+      kanaMode: "type",     // "type" or "trip"
       studyGroups: ["Vowels", "K", "S"],
       dailyGoalMin: 30,
     },
     items: {},        // "kana:か" / "word:ねこ" -> {box, due, right, wrong, last}
     tutorWords: [],   // words the tutor taught: {kana, kanji, en, added}
     mistakes: [],     // {at, said, correction, explanation, category}
+    confusions: {},   // "さ|ち" (sorted pair) -> times mixed up in Trip Up
     notes: "",        // the tutor's running notes about the learner
     days: {},         // "2026-11-20" -> {sec, reviews, msgs}
     sessions: [],     // [{id, mode, started, messages:[...]}], newest last
@@ -107,21 +109,41 @@ export function grade(id, correct) {
   if (correct) { it.right++; it.box = Math.min(it.box + 1, INTERVALS.length - 1); }
   else { it.wrong++; it.box = Math.max(0, Math.min(it.box - 2, 1)); }
   it.last = Date.now();
-  it.due = it.last + INTERVALS[it.box];
+  // Jitter every interval so items never settle into a fixed cycle; a missed
+  // item comes back after 20-60 seconds rather than immediately.
+  const base = INTERVALS[it.box] || 20000 + Math.random() * 40000;
+  it.due = it.last + base * (it.box ? 0.85 + Math.random() * 0.3 : 1);
   activity("review");
 }
 
-// Pick the next item: overdue reviews first (oldest due first),
-// then unseen items, then the least-recently seen.
-export function pickNext(ids, avoid) {
+// Pick the next item, always shuffled so no order or pattern repeats:
+// a random overdue item first, else a random unseen one, else a random pick
+// from the half that is closest to due. The last few items shown (and any
+// ids in `avoid`) are skipped whenever the pool is big enough.
+const recent = [];
+const pickRandom = (a) => a[Math.floor(Math.random() * a.length)];
+export function pickNext(ids, avoid = []) {
+  if (!ids.length) return null;
+  const avoidSet = new Set([].concat(avoid || []));
+  const keep = Math.min(3, Math.floor(ids.length / 2));
+  const blocked = new Set([...recent.slice(-keep), ...avoidSet]);
+  let pool = ids.filter((i) => !blocked.has(i));
+  if (!pool.length) pool = ids.filter((i) => i !== recent.at(-1));
+  if (!pool.length) pool = ids;
   const now = Date.now();
-  const pool = ids.length > 1 ? ids.filter((i) => i !== avoid) : ids;
-  const due = pool.filter((i) => db.items[i] && db.items[i].due <= now)
-    .sort((a, b) => db.items[a].due - db.items[b].due);
-  if (due.length) return due[0];
+  const due = pool.filter((i) => db.items[i] && db.items[i].due <= now);
   const fresh = pool.filter((i) => !db.items[i]);
-  if (fresh.length) return fresh[Math.floor(Math.random() * Math.min(fresh.length, 5))];
-  return pool.slice().sort((a, b) => db.items[a].due - db.items[b].due)[0];
+  let pick;
+  // Mix reviews and new items instead of strictly draining one list first.
+  if (due.length && (!fresh.length || Math.random() < 0.7)) pick = pickRandom(due);
+  else if (fresh.length) pick = pickRandom(fresh);
+  else {
+    const soonest = pool.slice().sort((a, b) => db.items[a].due - db.items[b].due);
+    pick = pickRandom(soonest.slice(0, Math.max(1, Math.ceil(soonest.length / 2))));
+  }
+  recent.push(pick);
+  if (recent.length > 10) recent.shift();
+  return pick;
 }
 
 export function countDue(ids) {

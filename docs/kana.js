@@ -53,3 +53,26 @@ export function romajiMatches(answer, romaji) {
   const a = answer.trim().toLowerCase();
   return a === romaji || (ALT[romaji] || []).includes(a);
 }
+
+// Hiragana that learners commonly mix up because they look alike.
+const LOOKALIKE_PAIRS = [
+  "あお", "あめ", "ぬめ", "おむ", "いり", "いこ", "こに", "にた", "うら", "うつ", "らろ", "るろ",
+  "さち", "さき", "きち", "けは", "はほ", "ほま", "まも", "ねれ", "ねわ", "れわ", "くへ", "すむ",
+  "しつ", "そろ", "ゆよ", "ぬの", "てと", "そて",
+  "ばぱ", "びぴ", "ぶぷ", "べぺ", "ぼぽ", "はば", "ひび", "ふぶ", "へべ", "ほぼ",
+  "さざ", "ちぢ", "きぎ", "けげ",
+];
+const COMBO_BASES = "きしちにひみりぎじびぴ";
+export const LOOKALIKES = {}; // kana -> Set of look-alikes
+function link(a, b) {
+  if (!KANA[a] || !KANA[b]) return;
+  (LOOKALIKES[a] ||= new Set()).add(b);
+  (LOOKALIKES[b] ||= new Set()).add(a);
+}
+for (const p of LOOKALIKE_PAIRS) { const [a, b] = [...p]; link(a, b); }
+for (const c of COMBO_BASES) { link(c + "ゅ", c + "ょ"); link(c + "ゃ", c + "ゅ"); }
+
+// Look-alikes of k that are inside the given set of kana.
+export function lookalikesIn(k, inSet) {
+  return [...(LOOKALIKES[k] || [])].filter((x) => inSet.has(x));
+}

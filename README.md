@@ -7,7 +7,7 @@ Two apps live here.
 A Claude-powered Japanese tutor you can talk to, plus kana and vocab review and progress tracking. It's in [`docs/`](docs/) and is served at https://mrshmonke.github.io/hiragana-flashcards/.
 
 - **Tutor**: conversation, Okinawa role-play, kana/vocab drills, anime line breakdowns, or ask anything. Press 🎤 (or Ctrl+M) and speak Japanese or English; replies are read aloud. The tutor corrects mistakes plainly and doesn't flatter. It logs your mistakes and new words to your progress and keeps notes on your level for future sessions.
-- **Kana**: type the romaji for each hiragana. Spaced repetition decides what comes back and when.
+- **Kana**: type the romaji for each hiragana. Spaced repetition decides what comes back and when. **Trip Up** mode drills only the look-alike kana inside your selected set (あ/お, さ/き/ち, ね/れ/わ, は/ほ, ば/ぱ…) as quick multiple choice, and tracks which pairs you mix up.
 - **Vocab**: ~320 words, limited to the kana you've picked, plus words the tutor taught you.
 - **Kana font**: Textbook mode shows kana like a printed hiragana chart, with italic romaji. Variable mode gives each flashcard a different style (mincho, gothic, rounded, handwritten, brush, pixel) so you learn to read kana anywhere.
 - **Progress**: streak, daily minutes, which kana are solid, logged mistakes, tutor notes, estimated API spend, and export/import.

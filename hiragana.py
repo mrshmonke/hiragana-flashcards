@@ -12,7 +12,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib  # noqa: E402
 
-APP_VERSION = 4
+APP_VERSION = 5
 APP_ID = "io.github.mrshmonke.HiraganaFlashcards"
 UPDATE_URL = ("https://raw.githubusercontent.com/mrshmonke/"
               "hiragana-flashcards/main/hiragana.py")
@@ -550,6 +550,10 @@ class Flashcards(Gtk.Box):
     def start(self):
         cards = self.get_cards()
         random.shuffle(cards)
+        # Don't open a new round with the card that ended the last one.
+        last = getattr(self, "current", None)
+        if last and len(cards) > 1 and cards[0]["front"] == last["front"]:
+            cards.append(cards.pop(0))
         self.queue = cards
         self.total = len(cards)
         self.missed = set()
@@ -601,7 +605,10 @@ class Flashcards(Gtk.Box):
         card = self.queue.pop(0)
         if not knew:
             self.missed.add(card["front"])
-            self.queue.insert(min(3, len(self.queue)), card)
+            # Bring a missed card back soon, at a random spot (never right
+            # away) so the order never settles into a pattern.
+            lo = 1 if len(self.queue) > 1 else len(self.queue)
+            self.queue.insert(random.randint(lo, max(lo, min(6, len(self.queue)))), card)
         self.next_card()
 
     def set_buttons(self, show=False, answer=False, restart=False):
