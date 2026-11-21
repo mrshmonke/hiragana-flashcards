@@ -631,7 +631,23 @@ $("voiceSetup").onclick = async () => {
   setTimeout(refreshVoice, 500);
 };
 $("sttModel").value = S.sttModel;
-$("sttModel").onchange = () => { S.sttModel = $("sttModel").value; save(); };
+let sttPoll = null;
+async function watchSttModel() {
+  clearTimeout(sttPoll);
+  const m = await voice.modelStatus();
+  if (!m) { $("sttStatus").textContent = ""; return; }
+  const busy = m.phase === "downloading" || m.phase === "loading";
+  $("sttStatus").textContent = busy || m.error ? voice.modelLabel(m)
+    : m.size === S.sttModel ? `The ${m.size} model is loaded and ready.` : "";
+  if (busy) sttPoll = setTimeout(watchSttModel, 1000);
+}
+$("sttModel").onchange = async () => {
+  S.sttModel = $("sttModel").value; save();
+  if (!voice.status.helper?.stt) return;
+  await voice.preloadModel(S.sttModel);
+  setTimeout(watchSttModel, 300);
+};
+document.querySelector('[data-tab="settings"]').addEventListener("click", () => watchSttModel());
 $("readAloud").value = S.readAloud;
 $("readAloud").onchange = () => { S.readAloud = $("readAloud").value; save(); };
 $("testVoice").onclick = () => {
