@@ -3,7 +3,7 @@ import { GROUPS, KANA, VOCAB, readable, romajiMatches, lookalikesIn } from "./ka
 import { MODELS, MODES, newSession, send, costSoFar } from "./tutor.js";
 import * as voice from "./voice.js";
 
-const VERSION = "6";
+const VERSION = "8";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
 
@@ -292,7 +292,9 @@ async function refreshVoice() {
   }
   if (h) {
     const parts = [h.stt ? "speech recognition ✓" : "speech recognition ✗", h.tts_ja ? "Japanese voice ✓" : "Japanese voice ✗", h.tts_en ? "English voice ✓" : "English voice: browser"];
-    $("voiceHelperStatus").textContent = `Voice helper running: ${parts.join(" · ")}${h.loading ? ` · loading ${h.loading}…` : ""}`;
+    $("voiceHelperStatus").textContent = `Voice helper running: ${parts.join(" · ")}`;
+    for (const o of $("sttModel").options) o.textContent = o.textContent.replace(/ ✓ downloaded$/, "") + ((h.downloaded || []).includes(o.value) ? " ✓ downloaded" : "");
+    watchSttModel();
   } else {
     $("voiceHelperStatus").textContent = voice.canListen()
       ? "Voice helper not running. Using this browser's built-in speech instead."
@@ -635,12 +637,40 @@ let sttPoll = null;
 async function watchSttModel() {
   clearTimeout(sttPoll);
   const m = await voice.modelStatus();
-  if (!m) { $("sttStatus").textContent = ""; return; }
-  const busy = m.phase === "downloading" || m.phase === "loading";
-  $("sttStatus").textContent = busy || m.error ? voice.modelLabel(m)
-    : m.size === S.sttModel ? `The ${m.size} model is loaded and ready.` : "";
+  const panel = $("sttPanel");
+  const busy = m && (m.phase === "downloading" || m.phase === "loading");
+  if (!m || (!busy && !m.error && m.size !== S.sttModel)) { panel.classList.add("hidden"); return; }
+  panel.classList.remove("hidden");
+  const bar = $("sttBar");
+  $("sttCancel").classList.toggle("hidden", m.phase !== "downloading");
+  $("sttRetry").classList.toggle("hidden", busy || !m.error);
+  if (m.phase === "downloading") {
+    $("sttTitle").textContent = `Downloading the ${m.size} speech model (one time only)`;
+    bar.classList.remove("hidden");
+    bar.max = m.total_mb || 1; bar.value = m.mb || 0;
+    const pct = m.total_mb ? Math.floor((100 * m.mb) / m.total_mb) : 0;
+    const speed = m.mbps ? `${m.mbps} MB/s` : "starting…";
+    const eta = m.eta_s != null ? ` · about ${voice.fmtTime(m.eta_s)} left` : "";
+    $("sttDetail").innerHTML = `${voice.fmtMB(m.mb)} of ${voice.fmtMB(m.total_mb)} (${pct}%) · ${speed}${eta} · running ${voice.fmtTime(m.elapsed_s)}<br>` +
+      `File: ${esc(m.file || "")}<br>Saving to <span class="path">${esc(m.dest || "")}</span><br>` +
+      `Voice input keeps working with a model you already have until this finishes.`;
+  } else if (m.phase === "loading") {
+    $("sttTitle").textContent = `Loading the ${m.size} speech model into memory`;
+    bar.classList.remove("hidden"); bar.removeAttribute("value");
+    $("sttDetail").textContent = `${m.elapsed_s} s so far. This usually takes 5 to 30 seconds, longer on slow computers.`;
+  } else if (m.error) {
+    $("sttTitle").textContent = "Speech model problem";
+    bar.classList.add("hidden");
+    $("sttDetail").textContent = m.error;
+  } else {
+    $("sttTitle").textContent = `The ${m.size} speech model is loaded and ready.`;
+    bar.classList.add("hidden");
+    $("sttDetail").textContent = "";
+  }
   if (busy) sttPoll = setTimeout(watchSttModel, 1000);
 }
+$("sttCancel").onclick = async () => { await voice.cancelModelDownload(); setTimeout(watchSttModel, 500); };
+$("sttRetry").onclick = async () => { await voice.preloadModel(S.sttModel); setTimeout(watchSttModel, 300); };
 $("sttModel").onchange = async () => {
   S.sttModel = $("sttModel").value; save();
   if (!voice.status.helper?.stt) return;
