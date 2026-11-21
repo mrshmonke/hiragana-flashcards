@@ -154,7 +154,9 @@ export function stopListening(cancel = false) {
 // The helper records from the microphone itself and stops when you pause.
 async function listenNative(lang, onStatus, model) {
   const post = (path) => fetch(HELPER + path, { method: "POST" }).catch(() => {});
-  active = { stop: () => post("/listen/stop"), cancel: () => post("/listen/cancel") };
+  let cancelNow;
+  const cancelled = new Promise((r) => { cancelNow = r; });
+  active = { stop: () => post("/listen/stop"), cancel: () => { post("/listen/cancel"); cancelNow({ text: "" }); } };
   const labels = { listening: "Listening… (start talking)", hearing: "Listening… (stops when you pause)", transcribing: "Transcribing…" };
   let polling = true;
   (async () => {
@@ -165,9 +167,9 @@ async function listenNative(lang, onStatus, model) {
   })();
   try {
     onStatus?.(labels.listening);
-    const r = await fetch(`${HELPER}/listen?lang=${lang.slice(0, 2)}&model=${encodeURIComponent(model)}`, { method: "POST" });
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.error || "Voice input failed");
+    const req = fetch(`${HELPER}/listen?lang=${lang.slice(0, 2)}&model=${encodeURIComponent(model)}`, { method: "POST" })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "Voice input failed"); return j; });
+    const j = await Promise.race([req, cancelled]);
     return (j.text || "").trim();
   } catch (e) {
     throw new Error(/fetch|network/i.test(e.message) ? "The voice helper stopped responding." : e.message);

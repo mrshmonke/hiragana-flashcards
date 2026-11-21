@@ -164,7 +164,24 @@ def listen(lang, size):
         if audio is None:
             return ""
         _mic["state"] = "transcribing"
-        return transcribe(audio, lang, size)
+        # Transcribe in the background so Cancel returns right away.
+        result = {}
+
+        def work():
+            try:
+                result["text"] = transcribe(audio, lang, size)
+            except Exception as e:
+                result["error"] = e
+        t = threading.Thread(target=work, daemon=True)
+        t.start()
+        while t.is_alive():
+            if _mic["cancel"]:
+                log("transcription cancelled")
+                return ""
+            t.join(0.1)
+        if "error" in result:
+            raise result["error"]
+        return result.get("text", "")
     finally:
         _mic.update(state="idle", proc=None)
         _mic_lock.release()
@@ -295,7 +312,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass   # the app stopped waiting (e.g. Cancel)
 
     def origin_ok(self):
         origin = self.headers.get("Origin")

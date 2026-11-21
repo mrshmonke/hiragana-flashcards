@@ -37,7 +37,8 @@
     <div id="log" aria-live="polite"></div>
     <div id="composer">
       <div class="row">
-        <button id="mic" class="mic" title="Talk (Ctrl+M)" aria-label="Talk">🎤</button>
+        <button id="mic" class="mic" title="Talk (Ctrl+M). Press again when you're done." aria-label="Talk">🎤</button>
+        <button id="cancelVoice" class="hidden" title="Stop listening and throw it away (Esc)">✕ Cancel</button>
         <textarea id="input" rows="1" placeholder="Type in English or Japanese, or press 🎤 and talk"></textarea>
         <button id="sendBtn" class="primary">Send</button>
         <button id="stopBtn" class="hidden">Stop</button>
@@ -59,6 +60,7 @@
       <button id="pickGroups" class="ghost">Choose kana…</button>
       <button id="showChart" class="ghost">Chart</button>
       <select id="kanaMode" aria-label="Practice type">
+        <option value="flip">Flashcards</option>
         <option value="type">Type the romaji</option>
         <option value="trip">Trip Up: look-alikes</option>
       </select>
@@ -76,7 +78,19 @@
       </div>
       <div id="tripInfo" class="muted small"></div>
     </div>
-    <div id="typeCard" class="card">
+    <div id="flipCard" class="card hidden">
+      <div id="flipFront" class="kana-big"></div>
+      <div id="flipBack" class="romaji-big"></div>
+      <div id="flipFontName" class="fontname"></div>
+      <div class="row center">
+        <button id="flipSay" class="ghost" title="Hear it">🔊</button>
+        <button id="flipShow" class="primary">Show answer (Space)</button>
+        <button id="flipMiss" class="bad hidden">Missed it (←)</button>
+        <button id="flipKnew" class="good hidden">Knew it (→)</button>
+      </div>
+      <div id="flipInfo" class="muted small"></div>
+    </div>
+    <div id="typeCard" class="card hidden">
       <div id="kanaFront" class="kana-big"></div>
       <div id="kanaRomaji" class="romaji-big"></div>
       <div id="kanaFontName" class="fontname"></div>

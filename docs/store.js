@@ -22,7 +22,7 @@ function blank() {
       readAloud: "all",     // "all" or "ja" (Japanese parts only)
       showRomaji: true,
       fontMode: "textbook", // "textbook" or "variable"
-      kanaMode: "type",     // "type" or "trip"
+      kanaMode: "flip",     // "flip" (flashcards), "type" or "trip"
       studyGroups: ["Vowels", "K", "S"],
       dailyGoalMin: 30,
     },
@@ -51,6 +51,8 @@ function load() {
 }
 
 export const db = load();
+// v6: flashcards are back as the default kana practice.
+if (!db.settings.flipDefault) { db.settings.kanaMode = "flip"; db.settings.flipDefault = true; }
 
 let saveTimer = null;
 export function save() {
