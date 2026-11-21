@@ -137,6 +137,25 @@ export async function speak(text, { jaRate = 0.85, enRate = 1.0, onlyJapanese = 
 let active = null; // { stop(), cancel() }
 
 // Listen once. onStatus gets text to show ("Listening…", live words, …).
+// Human-readable state of the speech model, or "" when it's ready/idle.
+export function modelLabel(m) {
+  if (!m) return "";
+  const gb = (mb) => (mb >= 1000 ? (mb / 1000).toFixed(1) + " GB" : mb + " MB");
+  if (m.phase === "downloading") return `Downloading the ${m.size} speech model, once: ${gb(m.mb || 0)} of about ${gb(m.total_mb)}…`;
+  if (m.phase === "loading") return `Loading the ${m.size} speech model into memory…`;
+  if (m.error) return m.error;
+  return "";
+}
+
+export async function modelStatus() {
+  try { const r = await fetch(HELPER + "/model/status", { cache: "no-store" }); return await r.json(); } catch { return null; }
+}
+
+// Download (if needed) and load a speech model now, instead of on the first 🎤.
+export function preloadModel(size) {
+  return fetch(`${HELPER}/model/load?model=${encodeURIComponent(size)}`, { method: "POST" }).catch(() => {});
+}
+
 // Resolves with the final transcript ("" if nothing heard).
 export function listen(lang, onStatus, { model = "small" } = {}) {
   stopListening(true);
@@ -154,20 +173,22 @@ export function stopListening(cancel = false) {
 // The helper records from the microphone itself and stops when you pause.
 async function listenNative(lang, onStatus, model) {
   const post = (path) => fetch(HELPER + path, { method: "POST" }).catch(() => {});
-  active = { stop: () => post("/listen/stop"), cancel: () => post("/listen/cancel") };
+  let cancelNow;
+  const cancelled = new Promise((r) => { cancelNow = r; });
+  active = { stop: () => post("/listen/stop"), cancel: () => { post("/listen/cancel"); cancelNow({ text: "" }); } };
   const labels = { listening: "Listening… (start talking)", hearing: "Listening… (stops when you pause)", transcribing: "Transcribing…" };
   let polling = true;
   (async () => {
     while (polling) {
-      try { const r = await fetch(HELPER + "/listen/status", { cache: "no-store" }); const j = await r.json(); if (polling && labels[j.state]) onStatus?.(labels[j.state]); } catch {}
+      try { const r = await fetch(HELPER + "/listen/status", { cache: "no-store" }); const j = await r.json(); if (!polling) continue; const m = j.state === "transcribing" && modelLabel(j.model); if (m) onStatus?.(m); else if (labels[j.state]) onStatus?.(labels[j.state]); } catch {}
       await new Promise((r) => setTimeout(r, 300));
     }
   })();
   try {
     onStatus?.(labels.listening);
-    const r = await fetch(`${HELPER}/listen?lang=${lang.slice(0, 2)}&model=${encodeURIComponent(model)}`, { method: "POST" });
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.error || "Voice input failed");
+    const req = fetch(`${HELPER}/listen?lang=${lang.slice(0, 2)}&model=${encodeURIComponent(model)}`, { method: "POST" })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "Voice input failed"); return j; });
+    const j = await Promise.race([req, cancelled]);
     return (j.text || "").trim();
   } catch (e) {
     throw new Error(/fetch|network/i.test(e.message) ? "The voice helper stopped responding." : e.message);

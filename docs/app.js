@@ -3,7 +3,7 @@ import { GROUPS, KANA, VOCAB, readable, romajiMatches, lookalikesIn } from "./ka
 import { MODELS, MODES, newSession, send, costSoFar } from "./tutor.js";
 import * as voice from "./voice.js";
 
-const VERSION = "5";
+const VERSION = "6";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
 
@@ -219,12 +219,14 @@ function autoGrow() { const t = $("input"); t.style.height = "auto"; t.style.hei
 $("input").addEventListener("input", autoGrow);
 
 // Voice input
-let listening = false;
+let listening = false, listenCancelled = false;
 async function startListening() {
   if (busy) return;
-  if (listening) { voice.stopListening(); return; }
+  if (listening) { voice.stopListening(); return; }   // pressing 🎤 again = done talking
   listening = true;
+  listenCancelled = false;
   $("mic").classList.add("listening");
+  $("cancelVoice").classList.remove("hidden");
   $("voiceStatus").textContent = S.micLang === "ja-JP" ? "Listening (日本語)…" : "Listening (English)…";
   try {
     const text = await voice.listen(S.micLang, (t, live) => {
@@ -232,7 +234,8 @@ async function startListening() {
     }, { model: S.sttModel });
     $("input").value = ""; autoGrow();
     $("voiceStatus").textContent = "";
-    if (text) talk(text, { spoken: true });
+    if (listenCancelled) $("voiceStatus").textContent = "Cancelled.";
+    else if (text) talk(text, { spoken: true });
     else $("voiceStatus").textContent = "Didn't catch anything.";
   } catch (e) {
     $("voiceStatus").textContent = "";
@@ -240,9 +243,25 @@ async function startListening() {
   } finally {
     listening = false;
     $("mic").classList.remove("listening");
+    $("cancelVoice").classList.add("hidden");
   }
 }
+function cancelListening() {
+  if (!listening) return false;
+  listenCancelled = true;
+  voice.stopListening(true);
+  $("voiceStatus").textContent = "Cancelled.";
+  return true;
+}
 $("mic").onclick = startListening;
+$("cancelVoice").onclick = cancelListening;
+// Esc: cancel listening/transcribing, else stop Claude's reply, else stop the voice.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || currentTab !== "tutor") return;
+  if (cancelListening()) return;
+  if (busy) { abortCtl?.abort(); return; }
+  voice.stopSpeaking();
+});
 document.addEventListener("keydown", (e) => {
   if (e.ctrlKey && e.key.toLowerCase() === "m" && currentTab === "tutor") { e.preventDefault(); startListening(); }
 });
@@ -612,7 +631,23 @@ $("voiceSetup").onclick = async () => {
   setTimeout(refreshVoice, 500);
 };
 $("sttModel").value = S.sttModel;
-$("sttModel").onchange = () => { S.sttModel = $("sttModel").value; save(); };
+let sttPoll = null;
+async function watchSttModel() {
+  clearTimeout(sttPoll);
+  const m = await voice.modelStatus();
+  if (!m) { $("sttStatus").textContent = ""; return; }
+  const busy = m.phase === "downloading" || m.phase === "loading";
+  $("sttStatus").textContent = busy || m.error ? voice.modelLabel(m)
+    : m.size === S.sttModel ? `The ${m.size} model is loaded and ready.` : "";
+  if (busy) sttPoll = setTimeout(watchSttModel, 1000);
+}
+$("sttModel").onchange = async () => {
+  S.sttModel = $("sttModel").value; save();
+  if (!voice.status.helper?.stt) return;
+  await voice.preloadModel(S.sttModel);
+  setTimeout(watchSttModel, 300);
+};
+document.querySelector('[data-tab="settings"]').addEventListener("click", () => watchSttModel());
 $("readAloud").value = S.readAloud;
 $("readAloud").onchange = () => { S.readAloud = $("readAloud").value; save(); };
 $("testVoice").onclick = () => {

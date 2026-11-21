@@ -37,7 +37,8 @@
     <div id="log" aria-live="polite"></div>
     <div id="composer">
       <div class="row">
-        <button id="mic" class="mic" title="Talk (Ctrl+M)" aria-label="Talk">🎤</button>
+        <button id="mic" class="mic" title="Talk (Ctrl+M). Press again when you're done." aria-label="Talk">🎤</button>
+        <button id="cancelVoice" class="hidden" title="Stop listening and throw it away (Esc)">✕ Cancel</button>
         <textarea id="input" rows="1" placeholder="Type in English or Japanese, or press 🎤 and talk"></textarea>
         <button id="sendBtn" class="primary">Send</button>
         <button id="stopBtn" class="hidden">Stop</button>
@@ -184,6 +185,7 @@
         <option value="large-v3-turbo">Large turbo (best; fast computers)</option>
       </select>
     </label>
+    <div id="sttStatus" class="muted small"></div>
     <p class="muted small">Bigger models hear Japanese better but take longer, and each downloads once (tiny 75 MB, base 150 MB, small 500 MB, medium 1.5 GB, large turbo 1.6 GB) the first time you use it.</p>
     <label class="field">Read aloud
       <select id="readAloud"><option value="all">Japanese and English</option><option value="ja">Japanese only</option></select>

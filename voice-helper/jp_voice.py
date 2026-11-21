@@ -7,6 +7,8 @@ Runs a tiny HTTP server on 127.0.0.1 (this computer only):
   POST /listen?lang=ja&model=small -> records from the microphone until you
                                   pause, then {"text": ...}
   POST /listen/stop | /listen/cancel, GET /listen/status
+  POST /model/load?model=medium  -> download (once) and load a speech model now
+  GET  /model/status             -> {"phase": downloading|loading|ready|idle, "mb", "total_mb"}
   POST /stt?lang=ja&model=small  body: recorded audio (webm/ogg/wav) -> {"text": ...}
   POST /tts  {"text": ..., "lang": "ja"|"en", "speed": 1.0}  -> audio/wav
 
@@ -45,8 +47,11 @@ WHISPER_SIZES = ["tiny", "base", "small", "medium", "large-v3-turbo"]
 DEFAULT_SIZE = os.environ.get("JP_VOICE_MODEL", "small")
 IDLE_UNLOAD_SEC = 15 * 60   # free the RAM if voice input isn't used for a while
 
-_lock = threading.Lock()
-_whisper = {"size": None, "model": None, "last": 0.0, "loading": None}
+_lock = threading.Lock()      # English voice
+_wlock = threading.Lock()     # Whisper (separate, so a long download never blocks speech)
+_whisper = {"size": None, "model": None, "last": 0.0, "loading": None, "phase": None, "error": ""}
+# Approximate download sizes, for the progress readout.
+WHISPER_MB = {"tiny": 75, "base": 145, "small": 485, "medium": 1530, "large-v3-turbo": 1620}
 _piper = {"voice": None}
 
 
@@ -55,22 +60,68 @@ def log(*a):
 
 
 # ---------- speech to text ----------
+def whisper_dir(size):
+    hits = sorted((MODELS_DIR / "whisper").glob(f"models--*--faster-whisper-{size}"))
+    return hits[0] if hits else None
+
+
+def whisper_downloaded(size):
+    d = whisper_dir(size)
+    return bool(d and list(d.glob("snapshots/*/model.bin")))
+
+
+def whisper_progress():
+    """What the speech model is doing right now, for the app's status line."""
+    size = _whisper["loading"]
+    if not size:
+        return {"phase": "ready" if _whisper["size"] else "idle", "size": _whisper["size"],
+                "error": _whisper["error"]}
+    have = 0
+    d = whisper_dir(size)
+    if d and _whisper["phase"] == "downloading":
+        for f in (d / "blobs").glob("*"):
+            try:
+                have += f.stat().st_size
+            except OSError:
+                pass
+    return {"phase": _whisper["phase"], "size": size, "mb": round(have / 1e6),
+            "total_mb": WHISPER_MB.get(size, 0), "error": ""}
+
+
 def get_whisper(size):
     from faster_whisper import WhisperModel
-    with _lock:
+    from faster_whisper.utils import download_model
+    with _wlock:
         if _whisper["model"] is None or _whisper["size"] != size:
-            _whisper["model"] = None
-            _whisper["loading"] = size
-            log(f"loading Whisper {size} (downloads once if needed)...")
-            threads = max(1, (os.cpu_count() or 2) - 1)
-            _whisper["model"] = WhisperModel(size, device="cpu", compute_type="int8",
-                                             cpu_threads=threads,
-                                             download_root=str(MODELS_DIR / "whisper"))
-            _whisper["size"] = size
-            _whisper["loading"] = None
-            log(f"Whisper {size} ready")
+            _whisper.update(model=None, size=None, loading=size, error="")
+            try:
+                have = whisper_downloaded(size)
+                if not have:
+                    _whisper["phase"] = "downloading"
+                    log(f"downloading Whisper {size} (about {WHISPER_MB.get(size)} MB, once)...")
+                path = download_model(size, cache_dir=str(MODELS_DIR / "whisper"),
+                                      local_files_only=have)
+                _whisper["phase"] = "loading"
+                t = time.time()
+                threads = max(1, (os.cpu_count() or 2) - 1)
+                _whisper["model"] = WhisperModel(path, device="cpu", compute_type="int8",
+                                                 cpu_threads=threads)
+                _whisper["size"] = size
+                log(f"Whisper {size} ready (loaded in {time.time() - t:.1f}s)")
+            except Exception as e:
+                _whisper["error"] = f"Couldn't get the {size} speech model: {e}"
+                raise
+            finally:
+                _whisper.update(loading=None, phase=None)
         _whisper["last"] = time.time()
         return _whisper["model"]
+
+
+def preload(size):
+    try:
+        get_whisper(size)
+    except Exception as e:
+        log("preload failed:", repr(e))
 
 
 def transcribe(audio, lang, size):
@@ -159,12 +210,29 @@ def listen(lang, size):
         raise RuntimeError("Already listening.")
     try:
         # Load the model while the person talks, so transcription starts sooner.
-        threading.Thread(target=get_whisper, args=(size,), daemon=True).start()
+        threading.Thread(target=preload, args=(size,), daemon=True).start()
         audio = record_until_pause()
         if audio is None:
             return ""
         _mic["state"] = "transcribing"
-        return transcribe(audio, lang, size)
+        # Transcribe in the background so Cancel returns right away.
+        result = {}
+
+        def work():
+            try:
+                result["text"] = transcribe(audio, lang, size)
+            except Exception as e:
+                result["error"] = e
+        t = threading.Thread(target=work, daemon=True)
+        t.start()
+        while t.is_alive():
+            if _mic["cancel"]:
+                log("transcription cancelled")
+                return ""
+            t.join(0.1)
+        if "error" in result:
+            raise result["error"]
+        return result.get("text", "")
     finally:
         _mic.update(state="idle", proc=None)
         _mic_lock.release()
@@ -173,7 +241,7 @@ def listen(lang, size):
 def unload_when_idle():
     while True:
         time.sleep(60)
-        with _lock:
+        with _wlock:
             if _whisper["model"] is not None and time.time() - _whisper["last"] > IDLE_UNLOAD_SEC:
                 _whisper["model"] = None
                 _whisper["size"] = None
@@ -252,9 +320,8 @@ def available():
            "setup": dict(_setup),
            "models": WHISPER_SIZES, "default_model": DEFAULT_SIZE,
            "loaded_model": _whisper["size"], "loading": _whisper["loading"],
-           "downloaded": sorted(p.name.split("faster-whisper-")[-1]
-                                for p in (MODELS_DIR / "whisper").glob("models--*"))
-                         if (MODELS_DIR / "whisper").exists() else []}
+           "model_status": whisper_progress(),
+           "downloaded": [s for s in WHISPER_SIZES if whisper_downloaded(s)]}
     try:
         import faster_whisper  # noqa: F401
         out["stt"] = True
@@ -295,7 +362,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass   # the app stopped waiting (e.g. Cancel)
 
     def origin_ok(self):
         origin = self.headers.get("Origin")
@@ -320,7 +390,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/health":
             return self.reply(200, available())
         if path == "/listen/status":
-            return self.reply(200, {"state": _mic["state"]})
+            return self.reply(200, {"state": _mic["state"], "model": whisper_progress()})
+        if path == "/model/status":
+            return self.reply(200, whisper_progress())
         return self.static(path)
 
     def static(self, path):
@@ -360,6 +432,12 @@ class Handler(BaseHTTPRequestHandler):
                     if size not in WHISPER_SIZES:
                         size = DEFAULT_SIZE
                     threading.Thread(target=run_setup, args=(size,), daemon=True).start()
+                return self.reply(200, {"ok": True})
+            if url.path == "/model/load":
+                size = q.get("model", DEFAULT_SIZE)
+                if size not in WHISPER_SIZES:
+                    return self.reply(400, {"error": f"model must be one of {WHISPER_SIZES}"})
+                threading.Thread(target=preload, args=(size,), daemon=True).start()
                 return self.reply(200, {"ok": True})
             if url.path in ("/listen/stop", "/listen/cancel"):
                 _mic["stop" if url.path.endswith("stop") else "cancel"] = True
