@@ -364,49 +364,14 @@ function studySet() {
   return new Set(GROUPS.filter((g) => S.studyGroups.includes(g.name)).flatMap((g) => g.cards.map(([k]) => k)));
 }
 function showKanaMode() {
-  const mode = S.kanaMode;
-  $("kanaMode").value = mode;
-  $("tripCard").classList.toggle("hidden", mode !== "trip");
-  $("typeCard").classList.toggle("hidden", mode !== "type");
-  $("flipCard").classList.toggle("hidden", mode !== "flip");
-  if (mode === "trip") { $("kanaInfo").textContent = ""; if (!trip) nextTrip(); }
-  else if (mode === "flip") { $("kanaInfo").textContent = ""; if (!flipCur) nextFlip(); }
+  const tripMode = S.kanaMode === "trip";
+  $("kanaMode").value = S.kanaMode;
+  $("tripCard").classList.toggle("hidden", !tripMode);
+  $("typeCard").classList.toggle("hidden", tripMode);
+  if (tripMode) { $("kanaInfo").textContent = ""; if (!trip) nextTrip(); }
   else { if (!kanaCur) nextKana(); setTimeout(() => $("kanaAnswer").focus(), 0); }
 }
-
-/* Classic flashcards: see the kana, flip, say whether you knew it. */
-let flipCur = null, flipShown = false;
-function nextFlip() {
-  const ids = kanaIds();
-  flipCur = pickNext(ids, flipCur ? [flipCur] : []);
-  flipShown = false;
-  $("flipFront").textContent = flipCur ? flipCur.slice(5) : "";
-  applyCardFont($("flipFront"), $("flipFontName"));
-  $("flipBack").innerHTML = "&nbsp;";
-  $("flipShow").classList.remove("hidden");
-  $("flipMiss").classList.add("hidden"); $("flipKnew").classList.add("hidden");
-  $("flipInfo").textContent = `${ids.length} kana · ${countDue(ids)} due · ${ids.filter((i) => !db.items[i]).length} new`;
-}
-function showFlip() {
-  if (!flipCur || flipShown) return;
-  flipShown = true;
-  $("flipBack").innerHTML = romajiHTML(KANA[flipCur.slice(5)].romaji);
-  $("flipShow").classList.add("hidden");
-  $("flipMiss").classList.remove("hidden"); $("flipKnew").classList.remove("hidden");
-}
-function answerFlip(ok) { if (!flipCur || !flipShown) return; grade(flipCur, ok); nextFlip(); }
-$("flipFront").onclick = showFlip;
-$("flipShow").onclick = showFlip;
-$("flipKnew").onclick = () => answerFlip(true);
-$("flipMiss").onclick = () => answerFlip(false);
-$("flipSay").onclick = () => flipCur && voice.speak(flipCur.slice(5), { jaRate: S.jaRate });
-document.addEventListener("keydown", (e) => {
-  if (currentTab !== "kana" || S.kanaMode !== "flip" || e.target.matches("input, textarea, select")) return;
-  if (e.key === " ") { e.preventDefault(); flipShown ? answerFlip(true) : showFlip(); }
-  else if (e.key === "ArrowRight" || e.key === "1") answerFlip(true);
-  else if (e.key === "ArrowLeft" || e.key === "2") answerFlip(false);
-});
-$("kanaMode").onchange = () => { S.kanaMode = $("kanaMode").value; save(); trip = null; flipCur = null; showKanaMode(); };
+$("kanaMode").onchange = () => { S.kanaMode = $("kanaMode").value; save(); trip = null; showKanaMode(); };
 
 function nextTrip() {
   const set = studySet();
@@ -495,7 +460,7 @@ function renderPicker() {
       const on = S.studyGroups.includes(g.name);
       if (on && S.studyGroups.length === 1) return;
       S.studyGroups = on ? S.studyGroups.filter((n) => n !== g.name) : [...S.studyGroups, g.name];
-      save(); renderPicker(); vCur = null; kanaCur = null; trip = null; flipCur = null; showKanaMode();
+      save(); renderPicker(); vCur = null; kanaCur = null; trip = null; showKanaMode();
       if (!$("kanaChart").classList.contains("hidden")) $("kanaChart").innerHTML = chartHTML(S.studyGroups, false);
     };
     p.appendChild(c);
@@ -653,7 +618,7 @@ $("effort").onchange = () => { S.effort = $("effort").value; save(); };
 $("showRomaji").onchange = () => { S.showRomaji = $("showRomaji").checked; save(); };
 document.querySelectorAll('input[name="fontMode"]').forEach((r) => {
   r.checked = r.value === S.fontMode;
-  r.onchange = () => { S.fontMode = r.value; save(); kanaCur = null; vCur = null; trip = null; flipCur = null; };
+  r.onchange = () => { S.fontMode = r.value; save(); kanaCur = null; vCur = null; trip = null; };
 });
 $("fontSamples").innerHTML = FONTS.map((f) => `<span><b style="font-family:${f.family.replace(/"/g, "'")}">あきさ</b>${esc(f.name.split(" (")[0])}</span>`).join("");
 $("jaRate").oninput = () => { S.jaRate = +$("jaRate").value; $("jaRateVal").textContent = S.jaRate + "×"; save(); };

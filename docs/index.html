@@ -60,7 +60,6 @@
       <button id="pickGroups" class="ghost">Choose kana…</button>
       <button id="showChart" class="ghost">Chart</button>
       <select id="kanaMode" aria-label="Practice type">
-        <option value="flip">Flashcards</option>
         <option value="type">Type the romaji</option>
         <option value="trip">Trip Up: look-alikes</option>
       </select>
@@ -78,19 +77,7 @@
       </div>
       <div id="tripInfo" class="muted small"></div>
     </div>
-    <div id="flipCard" class="card hidden">
-      <div id="flipFront" class="kana-big"></div>
-      <div id="flipBack" class="romaji-big"></div>
-      <div id="flipFontName" class="fontname"></div>
-      <div class="row center">
-        <button id="flipSay" class="ghost" title="Hear it">🔊</button>
-        <button id="flipShow" class="primary">Show answer (Space)</button>
-        <button id="flipMiss" class="bad hidden">Missed it (←)</button>
-        <button id="flipKnew" class="good hidden">Knew it (→)</button>
-      </div>
-      <div id="flipInfo" class="muted small"></div>
-    </div>
-    <div id="typeCard" class="card hidden">
+    <div id="typeCard" class="card">
       <div id="kanaFront" class="kana-big"></div>
       <div id="kanaRomaji" class="romaji-big"></div>
       <div id="kanaFontName" class="fontname"></div>

@@ -145,5 +145,4 @@ input[type=password], #apiKey { flex: 1; min-width: 0; }
 .drow .meta { font-size: 12px; color: var(--muted); }
 .drow.locked { opacity: .55; }
 .drow button { padding: 2px 8px; border: 0; background: none; }
-#flipFront { cursor: pointer; }
 #cancelVoice { border-color: var(--bad); color: var(--bad); }
