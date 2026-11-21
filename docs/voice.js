@@ -140,16 +140,23 @@ let active = null; // { stop(), cancel() }
 // Human-readable state of the speech model, or "" when it's ready/idle.
 export function modelLabel(m) {
   if (!m) return "";
-  const gb = (mb) => (mb >= 1000 ? (mb / 1000).toFixed(1) + " GB" : mb + " MB");
-  if (m.phase === "downloading") return `Downloading the ${m.size} speech model, once: ${gb(m.mb || 0)} of about ${gb(m.total_mb)}…`;
-  if (m.phase === "loading") return `Loading the ${m.size} speech model into memory…`;
+  if (m.phase === "downloading") {
+    const pct = m.total_mb ? Math.floor((100 * (m.mb || 0)) / m.total_mb) : 0;
+    const eta = m.eta_s != null ? `, about ${fmtTime(m.eta_s)} left` : "";
+    return `Downloading the ${m.size} speech model: ${fmtMB(m.mb || 0)} of ${fmtMB(m.total_mb)} (${pct}%)${eta}…`;
+  }
+  if (m.phase === "loading") return `Loading the ${m.size} speech model into memory (${m.elapsed_s || 0} s)…`;
   if (m.error) return m.error;
   return "";
 }
+export const fmtMB = (mb) => (mb >= 1000 ? (mb / 1000).toFixed(2) + " GB" : mb + " MB");
+export const fmtTime = (s) => (s >= 90 ? Math.round(s / 60) + " min" : s + " s");
 
 export async function modelStatus() {
   try { const r = await fetch(HELPER + "/model/status", { cache: "no-store" }); return await r.json(); } catch { return null; }
 }
+
+export const cancelModelDownload = () => fetch(HELPER + "/model/cancel", { method: "POST" }).catch(() => {});
 
 // Download (if needed) and load a speech model now, instead of on the first 🎤.
 export function preloadModel(size) {

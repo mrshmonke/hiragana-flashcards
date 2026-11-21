@@ -23,7 +23,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib  # noqa: E402
 
-APP_VERSION = 7
+APP_VERSION = 8
 APP_ID = "io.github.mrshmonke.HiraganaFlashcards"
 UPDATE_URL = ("https://raw.githubusercontent.com/mrshmonke/"
               "hiragana-flashcards/main/hiragana.py")
@@ -34,6 +34,7 @@ TUTOR_APP = os.path.join(TUTOR_HOME, "app")
 HELPER_DIR = os.path.join(TUTOR_HOME, "voice-helper")
 HELPER_PY = os.path.join(TUTOR_HOME, "venv", "bin", "python")
 HELPER_URL = "http://127.0.0.1:8770"
+HELPER_VERSION = 2   # restart a running helper older than this (after updates)
 STAMP = os.path.join(TUTOR_HOME, "app-version")
 
 try:
@@ -1031,6 +1032,34 @@ def helper_up():
         return False
 
 
+def helper_version():
+    try:
+        with urllib.request.urlopen(HELPER_URL + "/health", timeout=2) as r:
+            return int(json.loads(r.read()).get("version", 0))
+    except Exception:
+        return None
+
+
+def stop_helper():
+    """Stop a helper left running from before (e.g. an older version after an
+    update), so the new code is the one that runs."""
+    try:
+        req = urllib.request.Request(HELPER_URL + "/quit", method="POST")
+        urllib.request.urlopen(req, timeout=2).read()
+    except Exception:
+        pass
+    for _ in range(20):
+        if not helper_up():
+            return
+        time.sleep(0.1)
+    # Older helpers have no /quit.
+    subprocess.run(["pkill", "-f", "voice-helper/jp_voice.py"], check=False)
+    for _ in range(30):
+        if not helper_up():
+            return
+        time.sleep(0.1)
+
+
 def start_helper():
     """Start the local helper. Uses the voice environment if it's installed,
     otherwise plain python3 (the tutor works, voice input stays off)."""
@@ -1086,6 +1115,9 @@ class TutorWindow(Gtk.ApplicationWindow):
                           "Couldn't download the tutor. Check your internet connection and reopen the app.",
                           "about:blank")
             return
+        v = helper_version()
+        if v is not None and v < HELPER_VERSION:
+            stop_helper()
         if not helper_up():
             self.helper = start_helper()
             for _ in range(100):
@@ -1122,6 +1154,8 @@ class TutorWindow(Gtk.ApplicationWindow):
         return False
 
     def install_update(self, _btn):
+        # Stop the voice helper too, so the updated one starts with the new app.
+        self.on_destroy()
         App.install_update(self, _btn)
 
     def on_destroy(self, *_a):
