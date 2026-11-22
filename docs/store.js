@@ -18,6 +18,9 @@ function blank() {
       handsFree: false,
       micLang: "ja-JP",
       jaRate: 0.85,
+      jaEngine: "voicevox", // "voicevox" (natural, once installed) or "basic" (Open JTalk)
+      jaVoice: 14,          // VOICEVOX voice (14 = 冥鳴ひまり)
+      textSize: "large",    // tutor chat text: normal | large | xlarge
       sttModel: "small",    // Whisper size used by the voice helper
       readAloud: "all",     // "all" or "ja" (Japanese parts only)
       showRomaji: true,

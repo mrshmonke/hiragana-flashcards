@@ -3,7 +3,7 @@ import { GROUPS, KANA, VOCAB, readable, romajiMatches, lookalikesIn } from "./ka
 import { MODELS, MODES, newSession, send, costSoFar } from "./tutor.js";
 import * as voice from "./voice.js";
 
-const VERSION = "8";
+const VERSION = "9";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
 
@@ -293,6 +293,7 @@ async function refreshVoice() {
   if (h) {
     const parts = [h.stt ? "speech recognition ✓" : "speech recognition ✗", h.tts_ja ? "Japanese voice ✓" : "Japanese voice ✗", h.tts_en ? "English voice ✓" : "English voice: browser"];
     $("voiceHelperStatus").textContent = `Voice helper running: ${parts.join(" · ")}`;
+    renderVoicevox(h.voicevox);
     for (const o of $("sttModel").options) o.textContent = o.textContent.replace(/ ✓ downloaded$/, "") + ((h.downloaded || []).includes(o.value) ? " ✓ downloaded" : "");
     watchSttModel();
   } else {
@@ -633,6 +634,56 @@ $("voiceSetup").onclick = async () => {
   setTimeout(refreshVoice, 500);
 };
 $("sttModel").value = S.sttModel;
+/* Japanese voice: VOICEVOX (natural) or Open JTalk (basic) */
+let vvPoll = null;
+function applyJaVoice(vv) {
+  const natural = !!vv?.installed && S.jaEngine === "voicevox";
+  voice.jaVoice.engine = natural ? "voicevox" : "basic";
+  voice.jaVoice.voice = S.jaVoice;
+}
+function renderVoicevox(vv) {
+  clearTimeout(vvPoll);
+  const sel = $("jaVoice");
+  const opts = [];
+  if (vv?.installed) for (const v of vv.voices) opts.push([String(v.id), `${v.name}${v.style && v.style !== "ノーマル" ? " (" + v.style + ")" : ""}`]);
+  opts.push(["basic", "Basic (Open JTalk, robotic)"]);
+  sel.innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
+  sel.value = vv?.installed && S.jaEngine === "voicevox" ? String(S.jaVoice) : "basic";
+  if (!sel.value) sel.value = opts[0][0];
+  applyJaVoice(vv);
+  const st = vv?.status || {};
+  const running = st.state === "running";
+  $("vvPanel").classList.toggle("hidden", !vv || (vv.installed && !running));
+  $("vvInstall").classList.toggle("hidden", running);
+  $("vvCancel").classList.toggle("hidden", !running);
+  $("vvBar").classList.toggle("hidden", !running);
+  if (running) {
+    $("vvBar").max = st.total_mb || 1; $("vvBar").value = st.mb || 0;
+    const eta = st.eta_s != null ? ` · about ${voice.fmtTime(st.eta_s)} left` : "";
+    $("vvDetail").textContent = `${st.step}… ${st.mb} of ${st.total_mb} MB${st.mbps ? ` · ${st.mbps} MB/s` : ""}${eta}`;
+    vvPoll = setTimeout(refreshVoice, 1000);
+  } else if (st.state === "failed") {
+    $("vvDetail").textContent = st.error;
+    $("vvInstall").textContent = "Try again";
+  }
+}
+$("vvInstall").onclick = async () => {
+  try { await voice.installVoicevox(); } catch {}
+  S.jaEngine = "voicevox"; save();
+  setTimeout(refreshVoice, 400);
+};
+$("vvCancel").onclick = async () => { await voice.cancelVoicevox(); setTimeout(refreshVoice, 600); };
+$("jaVoice").onchange = () => {
+  const v = $("jaVoice").value;
+  if (v === "basic") S.jaEngine = "basic"; else { S.jaEngine = "voicevox"; S.jaVoice = +v; }
+  save(); applyJaVoice(voice.status.helper?.voicevox);
+  voice.speak("こんにちは。きょうは いい てんき ですね。", { jaRate: S.jaRate });
+};
+function applyTextSize() { document.body.dataset.text = S.textSize; }
+applyTextSize();
+$("textSize").value = S.textSize;
+$("textSize").onchange = () => { S.textSize = $("textSize").value; save(); applyTextSize(); };
+
 let sttPoll = null;
 async function watchSttModel() {
   clearTimeout(sttPoll);
