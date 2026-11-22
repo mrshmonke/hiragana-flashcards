@@ -158,6 +158,7 @@ Tracking (the app saves these to their progress):
 - Call add_word when you teach a genuinely useful new word.
 - Near the end of a session, or after you learn something important about their level, call update_learner_notes with updated notes.
 - Use tools quietly; don't mention them in your reply.
+- Call tools only through the API's tool use. Never write tool calls, XML tags or <invoke> markup in your reply text; the learner would see it.
 
 Current session mode: ${MODES[mode]?.label || "Conversation"}.
 
@@ -221,7 +222,7 @@ export async function send(session, userText, { onText, signal } = {}) {
     }
     let msg;
     try {
-      msg = await streamOnce(c, params, signal, (t) => onText?.(shown + t));
+      msg = await streamOnce(c, params, signal, (t) => onText?.(shown + (shown ? "\n\n" : "") + visible(t)));
     } catch (e) {
       if (params.fallbacks && e?.status === 400 && /fallback/i.test(e.message || "")) {
         noFallbacks = true;
@@ -234,7 +235,21 @@ export async function send(session, userText, { onText, signal } = {}) {
       throw friendlyError(e);
     }
     addUsage(msg.usage, model);
-    // Keep the full content (including thinking blocks) unchanged in history.
+    // Run tool calls the model wrote as text, and remove that markup from the
+    // reply and from history (so the model doesn't copy it later).
+    for (const b of msg.content) {
+      if (b.type !== "text") continue;
+      const { clean, calls } = extractLeakedCalls(b.text);
+      if (!calls.length && clean === b.text.trim()) continue;
+      b.text = clean;
+      for (const call of calls) {
+        if (!TOOL_NAMES.has(call.name)) continue;
+        try { runTool(call.name, call.input); } catch (err) { console.warn("leaked tool call failed", call, err); }
+      }
+    }
+    msg.content = msg.content.filter((b) => b.type !== "text" || b.text);
+    if (!msg.content.length) msg.content = [{ type: "text", text: "(noted)" }];
+    // Keep the full content (including thinking blocks) in history.
     session.messages.push({ role: "assistant", content: msg.content });
     const text = msg.content.filter((b) => b.type === "text").map((b) => b.text).join("");
     if (text) shown += (shown ? "\n\n" : "") + text;
@@ -261,6 +276,28 @@ export async function send(session, userText, { onText, signal } = {}) {
   save();
   return shown;
 }
+
+// Sometimes a model writes a tool call as text (<invoke name="add_word">…).
+// Run those calls anyway and keep the markup out of what the learner sees.
+const TOOL_NAMES = new Set(TOOLS.map((t) => t.name));
+const INVOKE_RE = /<(?:[\w-]+:)?invoke\s+name="([\w-]+)"\s*>([\s\S]*?)<\/(?:[\w-]+:)?invoke>/g;
+const PARAM_RE = /<(?:[\w-]+:)?parameter\s+name="([\w-]+)"\s*>([\s\S]*?)<\/(?:[\w-]+:)?parameter>/g;
+const WRAPPER_RE = /<\/?(?:[\w-]+:)?function_calls>/g;
+export function extractLeakedCalls(text) {
+  const calls = [];
+  let clean = text.replace(INVOKE_RE, (_m, name, body) => {
+    const input = {};
+    for (const p of body.matchAll(PARAM_RE)) input[p[1]] = p[2].trim();
+    calls.push({ name, input });
+    return "";
+  }).replace(WRAPPER_RE, "");
+  // While streaming, hide a call that has started but not finished yet.
+  const open = clean.search(/<(?:[\w-]+:)?(?:invoke|function_calls)\b/);
+  if (open >= 0) clean = clean.slice(0, open);
+  clean = clean.replace(/\n\s*[↓⬇]\s*$/, "").replace(/\n{3,}/g, "\n\n").trim();
+  return { clean, calls };
+}
+const visible = (t) => extractLeakedCalls(t).clean;
 
 async function streamOnce(c, params, signal, onText) {
   const stream = c.beta.messages.stream(params, { signal });

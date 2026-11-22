@@ -1,6 +1,6 @@
 import { db, save, saveNow, today, activity, streak, grade, pickNext, countDue, exportJSON, importJSON, MASTERED_BOX } from "./store.js";
 import { GROUPS, KANA, VOCAB, readable, romajiMatches, lookalikesIn } from "./kana.js";
-import { MODELS, MODES, newSession, send, costSoFar } from "./tutor.js";
+import { MODELS, MODES, newSession, send, costSoFar, extractLeakedCalls } from "./tutor.js";
 import * as voice from "./voice.js";
 
 const VERSION = "10";
@@ -146,7 +146,7 @@ function renderSession() {
       flush();
       if (!m.content.startsWith("(Session start)")) addMsg("me", m.content.replace(/^\[spoken\] /, "🎤 "));
     } else if (m.role === "assistant") {
-      const t = m.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+      const t = extractLeakedCalls(m.content.filter((b) => b.type === "text").map((b) => b.text).join("")).clean;
       if (t.trim()) reply += (reply ? "\n\n" : "") + t;
     }
   }
