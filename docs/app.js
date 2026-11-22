@@ -3,7 +3,7 @@ import { GROUPS, KANA, VOCAB, readable, romajiMatches, lookalikesIn } from "./ka
 import { MODELS, MODES, newSession, send, costSoFar } from "./tutor.js";
 import * as voice from "./voice.js";
 
-const VERSION = "9";
+const VERSION = "10";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
 
@@ -679,10 +679,12 @@ $("jaVoice").onchange = () => {
   save(); applyJaVoice(voice.status.helper?.voicevox);
   voice.speak("こんにちは。きょうは いい てんき ですね。", { jaRate: S.jaRate });
 };
-function applyTextSize() { document.body.dataset.text = S.textSize; }
+function applyTextSize() { document.body.dataset.text = S.textSize; document.body.dataset.jp = S.jpSize || "1.9"; }
 applyTextSize();
 $("textSize").value = S.textSize;
 $("textSize").onchange = () => { S.textSize = $("textSize").value; save(); applyTextSize(); };
+$("jpSize").value = S.jpSize || "1.9";
+$("jpSize").onchange = () => { S.jpSize = $("jpSize").value; save(); applyTextSize(); };
 
 let sttPoll = null;
 async function watchSttModel() {
