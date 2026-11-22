@@ -1,9 +1,9 @@
 import { db, save, saveNow, today, activity, streak, grade, pickNext, countDue, exportJSON, importJSON, MASTERED_BOX } from "./store.js";
 import { GROUPS, KANA, VOCAB, readable, romajiMatches, lookalikesIn } from "./kana.js";
-import { MODELS, MODES, newSession, send, costSoFar } from "./tutor.js";
+import { MODELS, MODES, newSession, send, costSoFar, extractLeakedCalls } from "./tutor.js";
 import * as voice from "./voice.js";
 
-const VERSION = "9";
+const VERSION = "10";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
 
@@ -146,7 +146,7 @@ function renderSession() {
       flush();
       if (!m.content.startsWith("(Session start)")) addMsg("me", m.content.replace(/^\[spoken\] /, "🎤 "));
     } else if (m.role === "assistant") {
-      const t = m.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+      const t = extractLeakedCalls(m.content.filter((b) => b.type === "text").map((b) => b.text).join("")).clean;
       if (t.trim()) reply += (reply ? "\n\n" : "") + t;
     }
   }
@@ -679,10 +679,12 @@ $("jaVoice").onchange = () => {
   save(); applyJaVoice(voice.status.helper?.voicevox);
   voice.speak("こんにちは。きょうは いい てんき ですね。", { jaRate: S.jaRate });
 };
-function applyTextSize() { document.body.dataset.text = S.textSize; }
+function applyTextSize() { document.body.dataset.text = S.textSize; document.body.dataset.jp = S.jpSize || "1.9"; }
 applyTextSize();
 $("textSize").value = S.textSize;
 $("textSize").onchange = () => { S.textSize = $("textSize").value; save(); applyTextSize(); };
+$("jpSize").value = S.jpSize || "1.9";
+$("jpSize").onchange = () => { S.jpSize = $("jpSize").value; save(); applyTextSize(); };
 
 let sttPoll = null;
 async function watchSttModel() {

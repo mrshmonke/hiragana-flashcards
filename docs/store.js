@@ -20,6 +20,7 @@ function blank() {
       jaRate: 0.85,
       jaEngine: "voicevox", // "voicevox" (natural, once installed) or "basic" (Open JTalk)
       jaVoice: 14,          // VOICEVOX voice (14 = 冥鳴ひまり)
+      jpSize: "1.9",        // Japanese in tutor chat, times the chat text size
       textSize: "large",    // tutor chat text: normal | large | xlarge
       sttModel: "small",    // Whisper size used by the voice helper
       readAloud: "all",     // "all" or "ja" (Japanese parts only)
