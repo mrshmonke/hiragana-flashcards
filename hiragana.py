@@ -23,7 +23,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib  # noqa: E402
 
-APP_VERSION = 8
+APP_VERSION = 9
 APP_ID = "io.github.mrshmonke.HiraganaFlashcards"
 UPDATE_URL = ("https://raw.githubusercontent.com/mrshmonke/"
               "hiragana-flashcards/main/hiragana.py")
@@ -34,7 +34,7 @@ TUTOR_APP = os.path.join(TUTOR_HOME, "app")
 HELPER_DIR = os.path.join(TUTOR_HOME, "voice-helper")
 HELPER_PY = os.path.join(TUTOR_HOME, "venv", "bin", "python")
 HELPER_URL = "http://127.0.0.1:8770"
-HELPER_VERSION = 2   # restart a running helper older than this (after updates)
+HELPER_VERSION = 3   # restart a running helper older than this (after updates)
 STAMP = os.path.join(TUTOR_HOME, "app-version")
 
 try:

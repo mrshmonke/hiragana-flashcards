@@ -82,10 +82,13 @@ export function stopSpeaking() {
   if (browserTTS) speechSynthesis.cancel();
 }
 
+// Japanese voice choice, set from Settings.
+export const jaVoice = { engine: "voicevox", voice: 14 };
+
 async function helperWav(text, lang, speed) {
   const r = await fetch(HELPER + "/tts", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, lang, speed }),
+    body: JSON.stringify({ text, lang, speed, engine: jaVoice.engine, voice: jaVoice.voice }),
   });
   if (!r.ok) throw new Error("tts " + r.status);
   return URL.createObjectURL(await r.blob());
@@ -156,6 +159,8 @@ export async function modelStatus() {
   try { const r = await fetch(HELPER + "/model/status", { cache: "no-store" }); return await r.json(); } catch { return null; }
 }
 
+export const installVoicevox = () => fetch(HELPER + "/setup/voicevox", { method: "POST" });
+export const cancelVoicevox = () => fetch(HELPER + "/setup/voicevox/cancel", { method: "POST" }).catch(() => {});
 export const cancelModelDownload = () => fetch(HELPER + "/model/cancel", { method: "POST" }).catch(() => {});
 
 // Download (if needed) and load a speech model now, instead of on the first 🎤.

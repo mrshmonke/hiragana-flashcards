@@ -11,7 +11,9 @@ Runs a tiny HTTP server on 127.0.0.1 (this computer only):
   POST /model/cancel             -> stop a download (Retry resumes it)
   GET  /model/status             -> {"phase": downloading|loading|ready|idle, "mb", "total_mb", ...}
   POST /stt?lang=ja&model=small  body: recorded audio (webm/ogg/wav) -> {"text": ...}
-  POST /tts  {"text": ..., "lang": "ja"|"en", "speed": 1.0}  -> audio/wav
+  POST /tts  {"text": ..., "lang": "ja"|"en", "speed": 1.0,
+             "engine": "voicevox"|"basic", "voice": <VOICEVOX style id>}  -> audio/wav
+  POST /setup/voicevox | /setup/voicevox/cancel  -> install natural Japanese voices
 
 Speech-to-text: Whisper via faster-whisper (CPU, int8).
 Japanese voice: Open JTalk via pyopenjtalk.  English voice: Piper (if installed).
@@ -32,7 +34,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-VERSION = 2
+VERSION = 3
 PORT = int(os.environ.get("JP_VOICE_PORT", "8770"))
 HOME = Path(os.environ.get("JP_VOICE_HOME", Path.home() / ".local/share/japanese-tutor"))
 MODELS_DIR = HOME / "models"
@@ -48,6 +50,9 @@ WHISPER_SIZES = ["tiny", "base", "small", "medium", "large-v3-turbo"]
 DEFAULT_SIZE = os.environ.get("JP_VOICE_MODEL", "small")
 IDLE_UNLOAD_SEC = 15 * 60   # free the RAM if voice input isn't used for a while
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from voicevox import VoiceVox  # noqa: E402
+
 _lock = threading.Lock()      # English voice
 _wlock = threading.Lock()     # Whisper (separate, so a long download never blocks speech)
 _whisper = {"size": None, "model": None, "last": 0.0, "loading": None, "load_started": 0.0, "error": ""}
@@ -58,6 +63,9 @@ _piper = {"voice": None}
 
 def log(*a):
     print(time.strftime("%H:%M:%S"), *a, flush=True)
+
+
+VV = VoiceVox(HOME, log)   # natural Japanese voices, once installed
 
 
 # ---------- speech to text ----------
@@ -465,6 +473,7 @@ def available():
            "models": WHISPER_SIZES, "default_model": DEFAULT_SIZE,
            "loaded_model": _whisper["size"], "loading": _whisper["loading"],
            "model_status": whisper_progress(),
+           "voicevox": VV.info(),
            "downloaded": [s for s in WHISPER_SIZES if whisper_downloaded(s)]}
     try:
         import faster_whisper  # noqa: F401
@@ -577,6 +586,15 @@ class Handler(BaseHTTPRequestHandler):
                         size = DEFAULT_SIZE
                     threading.Thread(target=run_setup, args=(size,), daemon=True).start()
                 return self.reply(200, {"ok": True})
+            if url.path == "/setup/voicevox":
+                if VV.status["state"] != "running":
+                    uv = HOME / "bin" / "uv"
+                    uv = str(uv) if uv.exists() else shutil.which("uv")
+                    threading.Thread(target=VV.install, args=(VENV_PY, uv), daemon=True).start()
+                return self.reply(200, {"ok": True})
+            if url.path == "/setup/voicevox/cancel":
+                VV.cancel = True
+                return self.reply(200, {"ok": True})
             if url.path == "/quit":
                 if self.headers.get("Origin"):
                     return self.reply(403, {"error": "not allowed"})
@@ -613,6 +631,11 @@ class Handler(BaseHTTPRequestHandler):
                     if not piper_available():
                         return self.reply(501, {"error": "English voice not installed"})
                     return self.reply(200, tts_en(text, speed), "audio/wav")
+                if req.get("engine") == "voicevox" and VV.installed():
+                    try:
+                        return self.reply(200, VV.tts(text, int(req.get("voice") or 0) or 14, speed), "audio/wav")
+                    except Exception as e:
+                        log("VOICEVOX failed, using Open JTalk:", repr(e))
                 return self.reply(200, tts_ja(text, speed), "audio/wav")
         except Exception as e:
             log("error:", repr(e))
@@ -627,6 +650,13 @@ def main():
         return
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     threading.Thread(target=unload_when_idle, daemon=True).start()
+    if VV.installed():   # warm up the natural voice so the first reply isn't slow
+        def warm():
+            try:
+                VV.load()
+            except Exception as e:
+                log("VOICEVOX didn't load:", repr(e))
+        threading.Thread(target=warm, daemon=True).start()
     srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     log(f"Japanese Tutor voice helper on http://127.0.0.1:{PORT}")
     srv.serve_forever()
