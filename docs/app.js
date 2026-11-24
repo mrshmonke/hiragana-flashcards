@@ -355,7 +355,6 @@ function checkKana() {
   $("kanaResult").textContent = ok ? "Correct" : `No, you typed “${ans.trim()}”`;
   $("kanaResult").className = "result " + (ok ? "ok" : "no");
   $("kanaNext").classList.remove("hidden");
-  if (ok) setTimeout(() => { if (kanaChecked && $("kanaFront").textContent === k) nextKana(); }, 700);
 }
 $("kanaAnswer").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); checkKana(); } });
 $("kanaNext").onclick = nextKana;
@@ -441,7 +440,6 @@ function answerTrip(k) {
   $("tripResult").innerHTML = ok ? "Correct" : `No. That's <span class="jp">${k}</span> (${KANA[k].romaji}). You wanted <span class="jp">${t}</span> (${KANA[t].romaji}).`;
   $("tripResult").className = "result " + (ok ? "ok" : "no");
   $("tripNext").classList.remove("hidden");
-  if (ok) { const cur = trip; setTimeout(() => { if (trip === cur) nextTrip(); }, 900); }
 }
 $("tripChoices").addEventListener("click", (e) => { const b = e.target.closest(".choice"); if (b) answerTrip(b.dataset.k); });
 $("tripNext").onclick = nextTrip;
