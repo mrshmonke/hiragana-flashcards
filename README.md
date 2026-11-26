@@ -34,6 +34,16 @@ Kana (typing and Trip Up), Vocab, Dictionary and Progress on your iPhone. No tut
 
 Progress stays on the phone. To bring progress over from the Linux app, use Progress → Export there and Settings → Import progress on the phone (AirDrop or Files works for moving the file). The code is `docs/ios/`; it shares the word list and review scheduling (`docs/data.js`, `kana.js`, `store.js`) with the Linux app, so new words show up in both. Updates download in the background and appear on the next launch; bump `CACHE` in `docs/ios/sw.js` if you add files.
 
+### Native iPhone app (TestFlight)
+
+`ios-native/` wraps the same `docs/ios` flashcards in a small Swift app (a WKWebView that serves the files from inside the app), so it opens from its own icon and works with no signal and no Safari. Progress is also copied to the app's own files and put back if web storage is ever cleared.
+
+No Mac needed: `.github/workflows/testflight.yml` builds it on GitHub's macOS runner with [XcodeGen](https://github.com/yonaskolb/XcodeGen) and uploads to TestFlight on every push to main that touches the app (or run it by hand from the Actions tab). Pull requests only check that it compiles. One-time setup:
+
+- App ID `io.github.mrshmonke.hiragana` on developer.apple.com, and an app with that bundle ID in App Store Connect.
+- An App Store Connect API key (Team Key, Admin role).
+- Repository secrets `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` (the whole .p8 file) and `APPLE_TEAM_ID`.
+
 ## Original flashcards (fallback)
 
 If WebKitGTK isn't installed, `hiragana.py` opens the original GTK flashcards (Kana, Vocab, Dictionary) instead, with a note on how to get the tutor window.

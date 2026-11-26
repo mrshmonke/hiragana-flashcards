@@ -7,6 +7,8 @@ import { GROUPS, KANA, VOCAB, readable, romajiMatches, lookalikesIn } from "../k
 const VERSION = "ios-1";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
+// Set when running inside the iPhone app (ios-native/), not in Safari.
+const native = window.webkit?.messageHandlers?.native || null;
 S.autoSay ??= false;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -347,7 +349,7 @@ function renderProgress() {
 }
 
 /* ---------- settings ---------- */
-const standalone = navigator.standalone || matchMedia("(display-mode: standalone)").matches;
+const standalone = native || navigator.standalone || matchMedia("(display-mode: standalone)").matches;
 $("installHelp").classList.toggle("hidden", !!standalone);
 document.querySelectorAll('input[name="fontMode"]').forEach((r) => {
   r.checked = r.value === S.fontMode;
@@ -367,9 +369,11 @@ $("testVoice").onclick = () => {
 $("dailyGoal").value = S.dailyGoalMin;
 $("dailyGoal").onchange = () => { S.dailyGoalMin = Math.max(5, +$("dailyGoal").value || 30); save(); };
 $("ver").textContent = VERSION;
+if (native) $("aboutText").textContent = "Works offline. New versions arrive through TestFlight.";
 
 $("exportBtn").onclick = async () => {
   const name = `japanese-progress-${today()}.json`;
+  if (native) { native.postMessage({ type: "share", name, data: exportJSON() }); return; }
   const file = new File([exportJSON()], name, { type: "application/json" });
   // The share sheet lets you save to Files, AirDrop it to the laptop, etc.
   if (navigator.canShare?.({ files: [file] })) {
@@ -391,8 +395,19 @@ $("importFile").onchange = async (e) => {
 
 /* ---------- start ---------- */
 showKanaMode(false);
-window.addEventListener("pagehide", saveNow);
-document.addEventListener("visibilitychange", () => { if (document.hidden) saveNow(); });
+// In the iPhone app, also keep a copy of progress in the app's own files,
+// which it puts back if the web storage is ever cleared.
+let lastBackup = null;
+function backupNative() {
+  if (!native) return;
+  try {
+    const s = localStorage.getItem("jp-tutor-v1");
+    if (s && s !== lastBackup) { native.postMessage({ type: "backup", data: s }); lastBackup = s; }
+  } catch {}
+}
+if (native) setInterval(backupNative, 15000);
+window.addEventListener("pagehide", () => { saveNow(); backupNative(); });
+document.addEventListener("visibilitychange", () => { if (document.hidden) { saveNow(); backupNative(); } });
 // Ask Safari not to clear saved progress when storage gets tight.
 navigator.storage?.persist?.().catch(() => {});
 if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(() => {});
