@@ -4,7 +4,7 @@
 import { db, save, saveNow, today, streak, grade, pickNext, countDue, exportJSON, importJSON, MASTERED_BOX } from "../store.js";
 import { GROUPS, KANA, VOCAB, readable, romajiMatches, lookalikesIn } from "../kana.js";
 
-const VERSION = "ios-1";
+const VERSION = "ios-2";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
 // Set when running inside the iPhone app (ios-native/), not in Safari.
@@ -158,7 +158,7 @@ function nextTrip() {
   $("tripNext").classList.add("hidden");
   if (!ids.length) {
     trip = null;
-    $("tripPrompt").innerHTML = "None of your kana look much alike yet. Tap “Kana…” and add more rows (T, N, H, M, R and W have lots of look-alikes) to unlock Trip Up.";
+    $("tripPrompt").innerHTML = "None of your kana look much alike yet. Tap “Change” under Kana I'm studying and add more rows (T, N, H, M, R and W have lots of look-alikes) to unlock Trip Up.";
     $("tripChoices").innerHTML = ""; $("tripInfo").textContent = ""; $("tripFontName").textContent = "";
     return;
   }
@@ -222,15 +222,26 @@ function renderPicker() {
       const on = S.studyGroups.includes(g.name);
       if (on && S.studyGroups.length === 1) return;
       S.studyGroups = on ? S.studyGroups.filter((n) => n !== g.name) : [...S.studyGroups, g.name];
-      save(); renderPicker(); vCur = null; kanaCur = null; trip = null; showKanaMode(false);
+      save(); renderPicker(); renderPickSummary(); vCur = null; kanaCur = null; trip = null; showKanaMode(false);
       if (!$("kanaChart").classList.contains("hidden")) $("kanaChart").innerHTML = chartHTML(S.studyGroups, false);
     };
     p.appendChild(c);
   }
+  const done = document.createElement("button");
+  done.className = "primary wide";
+  done.textContent = "Done";
+  done.onclick = () => $("pickGroups").click();
+  p.appendChild(done);
+}
+// Shows which rows are selected, e.g. "Vowels, K, S (15 kana)".
+function renderPickSummary() {
+  const on = GROUPS.filter((g) => S.studyGroups.includes(g.name));
+  const n = on.reduce((t, g) => t + g.cards.length, 0);
+  $("pickSummary").textContent = `${on.map((g) => g.name.replace(" (dakuten)", "")).join(", ")} (${n} kana)`;
 }
 $("pickGroups").onclick = () => {
-  const open = $("groupPicker").classList.toggle("hidden");
-  $("pickGroups").textContent = open ? "Kana…" : "Done";
+  const closed = $("groupPicker").classList.toggle("hidden");
+  $("pickAction").textContent = closed ? "Change" : "Done";
   renderPicker();
 };
 $("showChart").onclick = () => {
@@ -261,7 +272,7 @@ function nextVocab() {
   if (!ids.length) {
     vCur = null;
     $("vFront").className = "word en"; $("vFront").style.fontFamily = ""; $("vFontName").textContent = "";
-    $("vFront").textContent = $("deck").value === "tutor" ? "No tutor words yet." : "No words use only the kana you've picked yet. Add more rows in the Kana tab (Kana…).";
+    $("vFront").textContent = $("deck").value === "tutor" ? "No tutor words yet." : "No words use only the kana you've picked yet. Add more rows in the Kana tab (Kana I'm studying → Change).";
     $("vHint").classList.add("hidden");
     return;
   }
@@ -394,6 +405,7 @@ $("importFile").onchange = async (e) => {
 };
 
 /* ---------- start ---------- */
+renderPickSummary();
 showKanaMode(false);
 // In the iPhone app, also keep a copy of progress in the app's own files,
 // which it puts back if the web storage is ever cleared.
