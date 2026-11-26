@@ -25,6 +25,15 @@ Then open **Japanese Tutor** from the app launcher. If the installer says so, ru
 - `voice-helper/setup-voice.sh` installs the voice parts into `~/.local/share/japanese-tutor/venv` using [uv](https://github.com/astral-sh/uv). About 1 GB on disk plus the Whisper model.
 - To work on the UI in a browser: `cd docs && python3 -m http.server 8000`, and run `python3 voice-helper/jp_voice.py` for voice.
 
+## iPhone app
+
+Kana (typing and Trip Up), Vocab, Dictionary and Progress on your iPhone. No tutor. Works offline, no App Store, no Mac needed.
+
+1. On the iPhone, open **https://mrshmonke.github.io/hiragana-flashcards/ios/** in Safari.
+2. Tap Share, then **Add to Home Screen**. Open it from the new **Hiragana** icon.
+
+Progress stays on the phone. To bring progress over from the Linux app, use Progress → Export there and Settings → Import progress on the phone (AirDrop or Files works for moving the file). The code is `docs/ios/`; it shares the word list and review scheduling (`docs/data.js`, `kana.js`, `store.js`) with the Linux app, so new words show up in both. Updates download in the background and appear on the next launch; bump `CACHE` in `docs/ios/sw.js` if you add files.
+
 ## Original flashcards (fallback)
 
 If WebKitGTK isn't installed, `hiragana.py` opens the original GTK flashcards (Kana, Vocab, Dictionary) instead, with a note on how to get the tutor window.
