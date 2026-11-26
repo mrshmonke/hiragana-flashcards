@@ -1,0 +1,31 @@
+# XcodeGen spec. The GitHub workflow turns this into Hiragana.xcodeproj on a Mac runner.
+name: Hiragana
+options:
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Hiragana:
+    type: application
+    platform: iOS
+    scheme: {}
+    sources:
+      - path: Hiragana
+      # The flashcards web app, copied here by stage-web.sh before building.
+      - path: web
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.mrshmonke.hiragana
+        PRODUCT_NAME: Hiragana
+        INFOPLIST_FILE: Hiragana/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_BITCODE: NO

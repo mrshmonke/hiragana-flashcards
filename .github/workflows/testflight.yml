@@ -1,0 +1,113 @@
+# Builds the iPhone app on GitHub's Mac and uploads it to TestFlight.
+# Needs four repository secrets: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8
+# (the whole .p8 file from App Store Connect, Admin role) and APPLE_TEAM_ID.
+name: TestFlight
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "docs/ios/**"
+      - "ios-native/**"
+      - ".github/workflows/testflight.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/ios/**"
+      - "docs/store.js"
+      - "docs/kana.js"
+      - "docs/data.js"
+      - "docs/fonts/**"
+      - "ios-native/**"
+      - ".github/workflows/testflight.yml"
+
+concurrency:
+  group: testflight-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # On pull requests: just check that the app compiles (no signing, no upload).
+  check:
+    if: github.event_name == 'pull_request'
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build without signing
+        working-directory: ios-native
+        run: |
+          brew install xcodegen
+          ./stage-web.sh
+          xcodegen generate
+          xcodebuild build -project Hiragana.xcodeproj -scheme Hiragana -configuration Release \
+            -destination "generic/platform=iOS" CODE_SIGNING_ALLOWED=NO
+
+  build:
+    if: github.event_name != 'pull_request'
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check secrets
+        id: secrets
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=""
+          for s in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 APPLE_TEAM_ID; do
+            [ -n "${!s}" ] || missing="$missing $s"
+          done
+          if [ -n "$missing" ]; then
+            echo "::warning::Skipping the TestFlight build. Missing repository secrets:$missing"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate the Xcode project
+        if: steps.secrets.outputs.ok == 'true'
+        working-directory: ios-native
+        run: |
+          brew install xcodegen
+          ./stage-web.sh
+          xcodegen generate
+          xcodebuild -version
+
+      - name: Build, sign and upload to TestFlight
+        if: steps.secrets.outputs.ok == 'true'
+        working-directory: ios-native
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          key="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s\n' "$ASC_KEY_P8" > "$key"
+          auth=(-allowProvisioningUpdates
+                -authenticationKeyPath "$key"
+                -authenticationKeyID "$ASC_KEY_ID"
+                -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          sed "s/TEAM_ID_PLACEHOLDER/$APPLE_TEAM_ID/" ExportOptions.plist > "$RUNNER_TEMP/ExportOptions.plist"
+
+          xcodebuild archive \
+            -project Hiragana.xcodeproj -scheme Hiragana -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "$RUNNER_TEMP/Hiragana.xcarchive" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            "${auth[@]}"
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Hiragana.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            "${auth[@]}"
+
+          rm -f "$key"
+          echo "Uploaded build $BUILD_NUMBER. It shows up in TestFlight after Apple finishes processing (usually 5 to 15 minutes)."
