@@ -1,0 +1,22 @@
+/* Kanji tab (shared by the Linux app and the iPhone app). Kanji use the
+   system's Japanese font: the bundled fonts only cover kana. */
+.kanji-big { font-family: var(--jp); font-size: min(36vw, 132px); line-height: 1.15; min-height: 1.15em; font-weight: 400; }
+.kanji-mid { font-family: var(--jp); font-size: 72px; line-height: 1.1; }
+.kmean { font-size: 26px; font-weight: 600; }
+.back .kread { font-size: 17px; margin-top: 4px; }
+.back .kread .jp, .back .kexw .jp { font-family: var(--jp); font-size: 22px; }
+.kread .lbl { display: inline-block; min-width: 3.2em; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 8px; padding: 1px 6px; vertical-align: middle; }
+.kex { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; width: 100%; }
+.kexw { text-align: left; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; width: 100%; cursor: pointer; }
+.kexw .r { color: var(--muted); font-size: 17px !important; }
+.kexw .en { font-size: 16px; }
+.grade #kjMiss { grid-column: 1; } .grade #kjSay { grid-column: 2; } .grade #kjKnew { grid-column: 3; }
+.kgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 6px; margin-bottom: 8px; }
+.kcell { display: flex; flex-direction: column; align-items: center; padding: 6px 2px; min-height: 0; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--panel); color: var(--text); cursor: pointer; }
+.kcell .k { font-family: var(--jp); font-size: 30px; line-height: 1.15; }
+.kcell .m { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.kcell.b1 { background: #f8d3ce; } .kcell.b2 { background: #f7e7ad; } .kcell.b4 { background: #cfe8cb; }
+.kcell.b1, .kcell.b2, .kcell.b4 { color: #111; border-color: transparent; } .kcell.b1 .m, .kcell.b2 .m, .kcell.b4 .m { color: #444; }
+.kopen { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 0 0 10px; text-align: center; display: flex; flex-direction: column; align-items: center; }
