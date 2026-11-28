@@ -3,14 +3,23 @@
 .kanji-big { font-family: var(--jp); font-size: min(36vw, 132px); line-height: 1.15; min-height: 1.15em; font-weight: 400; }
 .kanji-mid { font-family: var(--jp); font-size: 72px; line-height: 1.1; }
 .kmean { font-size: 26px; font-weight: 600; }
-.back .kread { font-size: 17px; margin-top: 4px; }
-.back .kread .jp, .back .kexw .jp { font-family: var(--jp); font-size: 22px; }
-.kread .lbl { display: inline-block; min-width: 3.2em; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
-  border: 1px solid var(--line); border-radius: 8px; padding: 1px 6px; vertical-align: middle; }
+.kreads { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.kread { font-size: 17px; }
+.kread .rm { font-family: var(--romaji); font-style: italic; font-size: 24px; }
+.back .kread .jp { font-family: var(--jp); font-size: 17px; color: var(--muted); }
+.kread .lbl, .kuse { font-size: 12px; border-radius: 8px; padding: 1px 7px; vertical-align: middle; white-space: nowrap; color: var(--muted); border: 1px solid var(--line); }
+.kread.on .lbl, .kuse.on { color: #2f6fb0; border-color: #2f6fb055; }
+.kread.kun .lbl, .kuse.kun { color: #2e7d32; border-color: #2e7d3255; }
+@media (prefers-color-scheme: dark) { .kread.on .lbl, .kuse.on { color: #7fb2ea; } .kread.kun .lbl, .kuse.kun { color: #7fcf83; } }
+button.khelp { border: 0; background: none; padding: 2px 6px; min-height: 0; font-size: 14px; color: var(--muted); text-decoration: underline; cursor: pointer; }
+.kexplain { font-size: 15px; line-height: 1.5; text-align: left; color: var(--text); max-width: 34em; margin: 4px 0 0; }
 .kex { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; width: 100%; }
-.kexw { text-align: left; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; width: 100%; cursor: pointer; }
-.kexw .r { color: var(--muted); font-size: 17px !important; }
+.kexw { text-align: left; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; width: 100%; cursor: pointer; }
+.back .kexw .w { font-family: var(--jp); font-size: 22px; }
+.back .kexw .r { font-family: var(--jp); font-size: 15px; color: var(--muted); }
+.kexw .rr i { font-family: var(--romaji); font-size: 17px; color: var(--muted); }
 .kexw .en { font-size: 16px; }
+.kexw .kuse { margin-left: auto; }
 .grade #kjMiss { grid-column: 1; } .grade #kjSay { grid-column: 2; } .grade #kjKnew { grid-column: 3; }
 .kgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 6px; margin-bottom: 8px; }
 .kcell { display: flex; flex-direction: column; align-items: center; padding: 6px 2px; min-height: 0; border: 1px solid var(--line); border-radius: 10px;

@@ -6,7 +6,7 @@ import { GROUPS, KATA_GROUPS, scriptOf, studyCards, KANA, VOCAB, canRead, romaji
 import { initKanji, kanjiGridHTML, kanjiSolid } from "../kanji-ui.js";
 import { mountLessons } from "../lessons-ui.js";
 
-const VERSION = "ios-3";
+const VERSION = "ios-4";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
 S.autoSay ??= false;
