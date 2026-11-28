@@ -13,6 +13,7 @@ Install or update (no sudo):
 Then open **Japanese Tutor** from the app launcher. If the installer says so, run `sudo apt install gir1.2-webkit2-4.1` once (it's the component the window is drawn with). Paste your own Claude API key from [console.anthropic.com](https://console.anthropic.com/settings/keys) into Settings.
 
 - **Tutor**: conversation, Okinawa role-play, drills, anime line breakdowns, or ask anything. Press 🎤 (or Ctrl+M) and talk in Japanese or English; it stops listening when you pause, and reads replies aloud. It corrects mistakes plainly and doesn't flatter. It logs mistakes and new words and keeps notes on your level.
+- **Lessons**: a step-by-step course: all of hiragana, then greetings, introducing yourself, first sentences, numbers and prices, ordering food, and Okinawan words. Each lesson is a short read with examples you can hear, then a quiz (80% to pass). Passing a kana lesson adds those rows to Kana practice.
 - **Kana**: hiragana or katakana (including the foreign-sound combos like ファ and ティ). Type the romaji, or **Trip Up** mode for look-alike kana in your set (シ/ツ, ソ/ン...). Always shuffled.
 - **Kanji**: about 100 beginner kanji (mostly JLPT N5) in themed sets, with meanings, on/kun readings and example words you can hear.
 - **Vocab**, **Dictionary**, **Progress** (streak, minutes, kana chart, mix-ups, mistakes, API spend, export/import).
@@ -28,12 +29,16 @@ Then open **Japanese Tutor** from the app launcher. If the installer says so, ru
 
 ## iPhone app
 
-Kana (hiragana and katakana, typing and Trip Up), Kanji, Vocab, Dictionary and Progress on your iPhone. No tutor. Works offline, no App Store, no Mac needed.
+Lessons, Kana (hiragana and katakana, typing and Trip Up), Kanji, Vocab, Dictionary and Progress on your iPhone. No tutor. Works offline, no App Store, no Mac needed.
 
 1. On the iPhone, open **https://mrshmonke.github.io/hiragana-flashcards/ios/** in Safari.
 2. Tap Share, then **Add to Home Screen**. Open it from the new **Hiragana** icon.
 
 Progress stays on the phone. To bring progress over from the Linux app, use Progress → Export there and Settings → Import progress on the phone (AirDrop or Files works for moving the file). The code is `docs/ios/`; it shares the word list and review scheduling (`docs/data.js`, `kana.js`, `store.js`) with the Linux app, so new words show up in both. Updates download in the background and appear on the next launch; bump `CACHE` in `docs/ios/sw.js` if you add files.
+
+### Adding lessons
+
+Lessons are plain data in `docs/lessons.js`; the format is described at the top of that file. Append a lesson to `LESSONS` and it shows up in both apps (bump `APP_VERSION` in `hiragana.py`, and `CACHE` in `docs/ios/sw.js`). Never change a published lesson's `id`, since progress is saved under it.
 
 ## Original flashcards (fallback)
 

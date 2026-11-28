@@ -16,10 +16,14 @@
 <link rel="icon" href="../icon-192.png">
 <link rel="stylesheet" href="../fonts/fonts.css">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="../lessons.css">
 <link rel="stylesheet" href="../kanji.css">
 </head>
 <body>
 <main>
+  <!-- LESSONS (../lessons-ui.js) -->
+  <section id="lessons" class="tab"></section>
+
   <!-- KANA -->
   <section id="kana" class="tab on">
     <div class="bar">
@@ -170,6 +174,7 @@
 </main>
 
 <nav id="tabs" role="tablist">
+  <button data-tab="lessons"><span class="ic">📖</span>Lessons</button>
   <button data-tab="kana" class="on"><span class="ic jp">あ</span>Kana</button>
   <button data-tab="kanji"><span class="ic jp">字</span>Kanji</button>
   <button data-tab="vocab"><span class="ic jp">ことば</span>Vocab</button>

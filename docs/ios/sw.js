@@ -2,11 +2,12 @@
 // Opens from the saved copy (instant, no signal needed) and quietly fetches
 // updates in the background, so a new version shows up on the next launch.
 // Bump CACHE when the list of files changes.
-const CACHE = "hiragana-ios-2";
+const CACHE = "hiragana-ios-3";
 const FILES = [
   "./", "index.html", "app.js", "styles.css", "manifest.webmanifest", "apple-touch-icon.png",
   "../store.js", "../kana.js", "../data.js", "../icon-192.png",
   "../katakana-words.js", "../kanji.js", "../kanji-ui.js", "../kanji.css",
+  "../lessons.js", "../lessons-ui.js", "../lessons.css",
   "../fonts/CrimsonPro-Italic.woff2",
   "../fonts/DotGothic16-Regular.woff2",
   "../fonts/KleeOne-Regular.woff2",

@@ -4,8 +4,9 @@
 import { db, save, saveNow, today, streak, grade, pickNext, countDue, exportJSON, importJSON, MASTERED_BOX } from "../store.js";
 import { GROUPS, KATA_GROUPS, scriptOf, studyCards, KANA, VOCAB, canRead, romajiMatches, lookalikesIn } from "../kana.js";
 import { initKanji, kanjiGridHTML, kanjiSolid } from "../kanji-ui.js";
+import { mountLessons } from "../lessons-ui.js";
 
-const VERSION = "ios-2";
+const VERSION = "ios-3";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
 S.autoSay ??= false;
@@ -44,6 +45,7 @@ function showTab(name) {
   if (name === "kana") showKanaMode(false);
   if (name === "vocab" && !vCur) nextVocab();
   if (name === "dict") renderDict();
+  if (name === "lessons") lessons?.show();
   if (name === "kanji") kj.show();
 }
 $("tabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) showTab(b.dataset.tab); });
@@ -387,6 +389,12 @@ $("testVoice").onclick = () => {
 };
 $("dailyGoal").value = S.dailyGoalMin;
 $("dailyGoal").onchange = () => { S.dailyGoalMin = Math.max(5, +$("dailyGoal").value || 30); save(); };
+/* ---------- lessons ---------- */
+var lessons = mountLessons($("lessons"), {
+  say,
+  onKanaAdded: () => { kanaCur = null; vCur = null; trip = null; },
+});
+
 $("ver").textContent = VERSION;
 
 $("exportBtn").onclick = async () => {
