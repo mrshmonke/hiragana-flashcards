@@ -1,6 +1,7 @@
 // Beginner kanji: about 100, nearly all from JLPT N5, plus 海 and 島 for Okinawa.
-// on: readings borrowed from Chinese (written in katakana).
+// on: Chinese-origin readings (written in katakana).
 // kun: native Japanese readings (hiragana; the part in brackets is written in kana after the kanji).
+// The app works out which reading each example uses (kanji-ui.js usedReading).
 // ex: example words as "word reading meaning", separated by ";".
 const K = (k, en, on, kun, ex) => ({
   k, en, on, kun,
@@ -12,13 +13,13 @@ export const KANJI_GROUPS = [
     K("一", "one", "イチ", "ひと(つ)", "一つ ひとつ one (thing); 一人 ひとり one person"),
     K("二", "two", "ニ", "ふた(つ)", "二つ ふたつ two (things); 二人 ふたり two people"),
     K("三", "three", "サン", "みっ(つ)", "三つ みっつ three (things)"),
-    K("四", "four", "シ", "よん、よ", "四月 しがつ April"),
-    K("五", "five", "ゴ", "いつ(つ)", "五分 ごふん five minutes"),
-    K("六", "six", "ロク", "むっ(つ)", "六時 ろくじ six o'clock"),
-    K("七", "seven", "シチ", "なな", "七月 しちがつ July"),
-    K("八", "eight", "ハチ", "やっ(つ)", "八時 はちじ eight o'clock"),
-    K("九", "nine", "キュウ、ク", "ここの(つ)", "九時 くじ nine o'clock"),
-    K("十", "ten", "ジュウ", "とお", "十円 じゅうえん ten yen"),
+    K("四", "four", "シ", "よん、よ", "四月 しがつ April; 四つ よっつ four (things)"),
+    K("五", "five", "ゴ", "いつ(つ)", "五分 ごふん five minutes; 五つ いつつ five (things)"),
+    K("六", "six", "ロク", "むっ(つ)", "六時 ろくじ six o'clock; 六つ むっつ six (things)"),
+    K("七", "seven", "シチ", "なな", "七月 しちがつ July; 七つ ななつ seven (things)"),
+    K("八", "eight", "ハチ", "やっ(つ)", "八時 はちじ eight o'clock; 八つ やっつ eight (things)"),
+    K("九", "nine", "キュウ、ク", "ここの(つ)", "九時 くじ nine o'clock; 九つ ここのつ nine (things)"),
+    K("十", "ten", "ジュウ", "とお", "十円 じゅうえん ten yen; 十 とお ten (things)"),
     K("百", "hundred", "ヒャク", "", "三百 さんびゃく three hundred"),
     K("千", "thousand", "セン", "ち", "千円 せんえん 1,000 yen"),
     K("万", "ten thousand", "マン", "", "一万円 いちまんえん 10,000 yen"),

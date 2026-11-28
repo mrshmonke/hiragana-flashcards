@@ -2,6 +2,7 @@
 // same element ids (kj...); the Linux page also has a "Show answer" button.
 import { db, save, grade, pickNext, countDue, MASTERED_BOX } from "./store.js";
 import { KANJI, KANJI_GROUPS } from "./kanji.js";
+import { toRomaji } from "./kana.js";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -24,15 +25,45 @@ export function kanjiSolid() {
   return { solid: KANJI.filter((x) => (db.items["kanji:" + x.k]?.box || 0) >= MASTERED_BOX).length, total: KANJI.length };
 }
 
+// Romaji for a reading like "ひと(つ)" or "ジュウ".
+const romaji = (r) => r.replace(/[^()]+/g, (part) => toRomaji(part) || part);
+const hira = (s) => s.replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
+const noMarks = (s) => s.normalize("NFD").replace(/[\u3099\u309a]/g, "").normalize("NFC");
+const TYPE = { on: "Chinese-origin reading", kun: "Japanese reading" };
+
+function readings(x) {
+  const list = [];
+  for (const type of ["on", "kun"]) for (const r of (x[type] || "").split("、").filter(Boolean)) list.push({ type, r });
+  return list;
+}
+// Which reading an example word uses: the longest one found in its kana.
+// Sound changes are allowed (ひゃく → びゃく, がく → がっ).
+export function usedReading(x, e) {
+  const target = noMarks(e.r);
+  let best = null;
+  for (const rd of readings(x)) {
+    const stem = hira(rd.r.replace(/\(.*\)/, ""));
+    for (const f of [stem, stem.replace(/[くつちき]$/, "っ")]) {
+      if (f && target.includes(noMarks(f)) && (!best || f.length > best.len)) best = { ...rd, len: f.length };
+    }
+  }
+  return best;
+}
+
+const EXPLAIN = `Most kanji can be read more than one way. The <b>Chinese-origin reading</b> (on'yomi, written in katakana) is mostly used when kanji join up into words, like 四月 <i>shigatsu</i> (April). The <b>Japanese reading</b> (kun'yomi, written in hiragana) is mostly used when the kanji stands alone or has hiragana after it, like 四つ <i>yottsu</i> (four things). Don't try to memorise every reading: learn them through the example words, and the tag on each example shows which one it uses.`;
+
 // Meaning, readings and example words for one kanji.
 export function kanjiDetailHTML(x, withKanji) {
-  const rd = (label, v, tip) => v ? `<div class="kread"><span class="lbl" title="${tip}">${label}</span> <span class="jp">${esc(v)}</span></div>` : "";
+  const groups = ["on", "kun"].filter((t) => x[t]).map((t) =>
+    `<div class="kread ${t}"><span class="rm">${esc(x[t].split("、").map(romaji).join(", "))}</span> <span class="jp">${esc(x[t])}</span> <span class="lbl">${TYPE[t]}</span></div>`
+  ).join("");
   return (withKanji ? `<div class="kanji-mid">${x.k}</div>` : `<div class="kmean">${esc(x.en)}</div>`)
-    + rd("on", x.on, "Reading from Chinese, mostly used in words of two or more kanji")
-    + rd("kun", x.kun, "Native Japanese reading, often used when the kanji stands alone")
-    + `<div class="kex">${x.ex.map((e) =>
-      `<button class="kexw" data-say="${esc(e.r)}"><span class="jp">${esc(e.w)}</span> <span class="jp r">${esc(e.r)}</span> <span class="en">${esc(e.en)}</span></button>`
-    ).join("")}</div>`;
+    + `<div class="kreads">${groups}<button class="khelp" type="button">What are these?</button><p class="kexplain hidden">${EXPLAIN}</p></div>`
+    + `<div class="kex">${x.ex.map((e) => {
+      const u = usedReading(x, e);
+      const tag = u ? `<span class="kuse ${u.type}">uses ${esc(romaji(u.r.replace(/\(.*\)/, "")))}</span>` : `<span class="kuse">special reading</span>`;
+      return `<button class="kexw" data-say="${esc(e.r)}"><span class="jp w">${esc(e.w)}</span> <span class="rr"><span class="jp r">${esc(e.r)}</span> <i>${esc(toRomaji(e.r) || "")}</i></span> <span class="en">${esc(e.en)}</span>${tag}</button>`;
+    }).join("")}</div>`;
 }
 
 export function initKanji({ S, say, isActive = () => true, autoSay = () => false }) {
@@ -117,6 +148,8 @@ export function initKanji({ S, say, isActive = () => true, autoSay = () => false
     b.parentElement.after(d);
   });
   document.addEventListener("click", (e) => {
+    const h = e.target.closest(".khelp");
+    if (h) { e.stopPropagation(); h.nextElementSibling.classList.toggle("hidden"); return; }
     const b = e.target.closest(".kexw[data-say]");
     if (b) { e.stopPropagation(); say(b.dataset.say); }
   }, true);

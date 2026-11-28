@@ -5,7 +5,7 @@ import { MODELS, MODES, newSession, send, costSoFar, extractLeakedCalls } from "
 import * as voice from "./voice.js";
 import { mountLessons } from "./lessons-ui.js";
 
-const VERSION = "13";
+const VERSION = "14";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
 
