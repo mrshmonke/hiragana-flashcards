@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hiragana</title>
-<meta name="description" content="Hiragana and vocab flashcards, a dictionary and progress tracking. Works offline.">
+<meta name="description" content="Hiragana, katakana, kanji and vocab flashcards, a dictionary and progress tracking. Works offline.">
 <meta name="theme-color" content="#fbfaf8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#17171a" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,12 +16,17 @@
 <link rel="icon" href="../icon-192.png">
 <link rel="stylesheet" href="../fonts/fonts.css">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="../kanji.css">
 </head>
 <body>
 <main>
   <!-- KANA -->
   <section id="kana" class="tab on">
     <div class="bar">
+      <select id="kanaScript" aria-label="Script">
+        <option value="hira">Hiragana あ</option>
+        <option value="kata">Katakana ア</option>
+      </select>
       <select id="kanaMode" aria-label="Practice type">
         <option value="type">Type the romaji</option>
         <option value="trip">Trip Up: look-alikes</option>
@@ -52,6 +57,31 @@
       <div id="tripResult" class="result"></div>
       <button id="tripNext" class="primary wide hidden">Next</button>
       <div id="tripInfo" class="info"></div>
+    </div>
+  </section>
+
+  <!-- KANJI -->
+  <section id="kanji" class="tab">
+    <div class="bar">
+      <select id="kjDir" aria-label="Direction">
+        <option value="kanji">Kanji first</option>
+        <option value="meaning">Meaning first</option>
+      </select>
+      <button id="kjPick" class="ghost">Kanji sets…</button>
+      <button id="kjListBtn" class="ghost">List</button>
+    </div>
+    <div id="kjPicker" class="picker hidden"></div>
+    <div id="kjList" class="hidden"></div>
+    <div id="kjInfo" class="info"></div>
+    <div id="kjCard" class="card tappable">
+      <div id="kjFront" class="kanji-big"></div>
+      <div id="kjBack" class="back hidden"></div>
+      <div id="kjHint" class="info">Tap the card to see the meaning and readings</div>
+    </div>
+    <div class="grade">
+      <button id="kjMiss" class="bad hidden">Missed it</button>
+      <button id="kjSay" class="ghost say" aria-label="Hear an example">🔊</button>
+      <button id="kjKnew" class="good hidden">Knew it</button>
     </div>
   </section>
 
@@ -98,6 +128,11 @@
     <h3>Hiragana</h3>
     <p class="muted small">White: not seen yet. Red: shaky. Yellow: learning. Green: solid. * marks readings that break the row's pattern.</p>
     <div id="kanaGrid"></div>
+    <h3>Katakana</h3>
+    <div id="kataGrid"></div>
+    <h3>Kanji</h3>
+    <p class="muted small">Tap a kanji for its readings and example words.</p>
+    <div id="kanjiGrid"></div>
     <h3>Kana you mix up</h3>
     <div id="confusions" class="list"></div>
   </section>
@@ -136,6 +171,7 @@
 
 <nav id="tabs" role="tablist">
   <button data-tab="kana" class="on"><span class="ic jp">あ</span>Kana</button>
+  <button data-tab="kanji"><span class="ic jp">字</span>Kanji</button>
   <button data-tab="vocab"><span class="ic jp">ことば</span>Vocab</button>
   <button data-tab="dict"><span class="ic">🔍</span>Dictionary</button>
   <button data-tab="progress"><span class="ic">📈</span>Progress</button>

@@ -27,7 +27,11 @@ function blank() {
       showRomaji: true,
       fontMode: "textbook", // "textbook" or "variable"
       kanaMode: "type",     // "type" or "trip"
-      studyGroups: ["Vowels", "K", "S"],
+      studyGroups: ["Vowels", "K", "S"],   // hiragana rows being studied
+      kanaScript: "hira",   // Kana tab: "hira" (hiragana) or "kata" (katakana)
+      kataGroups: ["Vowels", "K", "S"],    // katakana rows being studied
+      kanjiSets: ["Numbers"],              // kanji groups being studied
+      kanjiDir: "kanji",    // "kanji" (kanji → meaning) or "meaning"
       dailyGoalMin: 30,
     },
     items: {},        // "kana:か" / "word:ねこ" -> {box, due, right, wrong, last}

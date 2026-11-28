@@ -1,9 +1,10 @@
 import { db, save, saveNow, today, activity, streak, grade, pickNext, countDue, exportJSON, importJSON, MASTERED_BOX } from "./store.js";
-import { GROUPS, KANA, VOCAB, readable, romajiMatches, lookalikesIn } from "./kana.js";
+import { GROUPS, KATA_GROUPS, scriptOf, studyCards, KANA, VOCAB, canRead, romajiMatches, lookalikesIn } from "./kana.js";
+import { initKanji, kanjiGridHTML, kanjiSolid } from "./kanji-ui.js";
 import { MODELS, MODES, newSession, send, costSoFar, extractLeakedCalls } from "./tutor.js";
 import * as voice from "./voice.js";
 
-const VERSION = "10";
+const VERSION = "12";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
 
@@ -15,6 +16,7 @@ function showTab(name) {
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.id === name));
   if (name === "progress") renderProgress();
   if (name === "kana") showKanaMode();
+  if (name === "kanji") kj.show();
   if (name === "vocab" && !vCur) nextVocab();
   if (name === "dict") { renderDict(); setTimeout(() => $("dictSearch").focus(), 0); }
   if (name === "tutor") refreshKeyBanner();
@@ -80,7 +82,7 @@ const IRREGULAR = new Set(["shi", "chi", "tsu"]);
 const romajiHTML = (r) => (IRREGULAR.has(r) ? `<sup>*</sup>${r}` : esc(r));
 // Place each row's kana in its column (a i u e o), leaving gaps like a real chart.
 const COLS = { a: 0, i: 1, u: 2, e: 3, o: 4 };
-function chartHTML(groupNames, withMastery) {
+function chartHTML(groupNames, withMastery, groups = GROUPS) {
   const cell = (k, r) => {
     let cls = "";
     if (withMastery) {
@@ -92,8 +94,8 @@ function chartHTML(groupNames, withMastery) {
   };
   const blank = '<div class="cell"></div>';
   const basic = [], combo = [];
-  for (const g of GROUPS.filter((x) => groupNames.includes(x.name))) {
-    if (g.name.startsWith("Combos")) { for (const [k, r] of g.cards) combo.push(cell(k, r)); continue; }
+  for (const g of groups.filter((x) => groupNames.includes(x.name))) {
+    if (g.name.startsWith("Combos") || g.name.startsWith("Extended")) { for (const [k, r] of g.cards) combo.push(cell(k, r)); continue; }
     if (g.cards.length === 5) { basic.push(...g.cards.map(([k, r]) => cell(k, r))); continue; }
     // Short rows (Y, W + n): put kana under their vowel column.
     const row = [blank, blank, blank, blank, blank];
@@ -324,7 +326,7 @@ refreshSpend();
 /* ---------- kana ---------- */
 let kanaCur = null, kanaChecked = false;
 function kanaIds() {
-  return GROUPS.filter((g) => S.studyGroups.includes(g.name)).flatMap((g) => g.cards.map(([k]) => "kana:" + k));
+  return studyCards(S).map(([k]) => "kana:" + k);
 }
 function nextKana() {
   const ids = kanaIds();
@@ -363,17 +365,28 @@ $("kanaNext").onclick = nextKana;
 let trip = null;
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 function studySet() {
-  return new Set(GROUPS.filter((g) => S.studyGroups.includes(g.name)).flatMap((g) => g.cards.map(([k]) => k)));
+  return new Set(studyCards(S).map(([k]) => k));
 }
 function showKanaMode() {
   const tripMode = S.kanaMode === "trip";
   $("kanaMode").value = S.kanaMode;
+  $("kanaScript").value = S.kanaScript;
   $("tripCard").classList.toggle("hidden", !tripMode);
   $("typeCard").classList.toggle("hidden", tripMode);
   if (tripMode) { $("kanaInfo").textContent = ""; if (!trip) nextTrip(); }
   else { if (!kanaCur) nextKana(); setTimeout(() => $("kanaAnswer").focus(), 0); }
 }
 $("kanaMode").onchange = () => { S.kanaMode = $("kanaMode").value; save(); trip = null; showKanaMode(); };
+$("kanaScript").onchange = () => {
+  S.kanaScript = $("kanaScript").value; save();
+  kanaCur = null; trip = null; showKanaMode();
+  if (!$("groupPicker").classList.contains("hidden")) renderPicker();
+  refreshChart();
+};
+const selectedRows = () => S[scriptOf(S).setting];
+function refreshChart() {
+  if (!$("kanaChart").classList.contains("hidden")) $("kanaChart").innerHTML = chartHTML(selectedRows(), false, scriptOf(S).groups);
+}
 
 function nextTrip() {
   const set = studySet();
@@ -453,16 +466,17 @@ $("kanaSay").onclick = () => kanaCur && voice.speak(kanaCur.slice(5), { jaRate: 
 function renderPicker() {
   const p = $("groupPicker");
   p.innerHTML = "";
-  for (const g of GROUPS) {
+  const sc = scriptOf(S), key = sc.setting;
+  for (const g of sc.groups) {
     const c = document.createElement("span");
-    c.className = "chip" + (S.studyGroups.includes(g.name) ? " on" : "");
+    c.className = "chip" + (S[key].includes(g.name) ? " on" : "");
     c.innerHTML = `${esc(g.name)} <span class="jp">${g.cards.map((x) => x[0]).join("")}</span>`;
     c.onclick = () => {
-      const on = S.studyGroups.includes(g.name);
-      if (on && S.studyGroups.length === 1) return;
-      S.studyGroups = on ? S.studyGroups.filter((n) => n !== g.name) : [...S.studyGroups, g.name];
+      const on = S[key].includes(g.name);
+      if (on && S[key].length === 1) return;
+      S[key] = on ? S[key].filter((n) => n !== g.name) : [...S[key], g.name];
       save(); renderPicker(); vCur = null; kanaCur = null; trip = null; showKanaMode();
-      if (!$("kanaChart").classList.contains("hidden")) $("kanaChart").innerHTML = chartHTML(S.studyGroups, false);
+      refreshChart();
     };
     p.appendChild(c);
   }
@@ -471,9 +485,12 @@ $("pickGroups").onclick = () => { $("groupPicker").classList.toggle("hidden"); r
 $("showChart").onclick = () => {
   const c = $("kanaChart");
   c.classList.toggle("hidden");
-  c.innerHTML = chartHTML(S.studyGroups, false);
+  c.innerHTML = chartHTML(selectedRows(), false, scriptOf(S).groups);
   $("showChart").textContent = c.classList.contains("hidden") ? "Chart" : "Hide chart";
 };
+
+/* ---------- kanji ---------- */
+const kj = initKanji({ S, say: (t) => voice.speak(t, { jaRate: S.jaRate }), isActive: () => currentTab === "kanji" });
 
 /* ---------- vocab ---------- */
 let vCur = null, vRevealed = false;
@@ -482,7 +499,7 @@ for (const t of topics) $("topic").add(new Option(t, t));
 function vocabPool() {
   if ($("deck").value === "tutor") return db.tutorWords.map((w) => ({ ...w, romaji: "", id: "word:" + w.kana }));
   const t = $("topic").value;
-  return VOCAB.filter((w) => readable(w, S.studyGroups) && (t === "All topics" || w.topic === t)).map((w) => ({ ...w, id: "word:" + w.kana }));
+  return VOCAB.filter((w) => canRead(w, S) && (t === "All topics" || w.topic === t)).map((w) => ({ ...w, id: "word:" + w.kana }));
 }
 function nextVocab() {
   const pool = vocabPool();
@@ -497,7 +514,7 @@ function nextVocab() {
     vCur = null;
     $("vFront").className = "word en";
     $("vFront").style.fontFamily = ""; $("vFontName").textContent = "";
-    $("vFront").textContent = $("deck").value === "tutor" ? "No tutor words yet. They appear here as the tutor teaches you." : "No words use only the kana you've picked yet. Add more kana groups in the Kana tab.";
+    $("vFront").textContent = $("deck").value === "tutor" ? "No tutor words yet. They appear here as the tutor teaches you." : "No words use only the kana you've picked yet. Add more kana groups in the Kana tab. Katakana words appear once you study katakana rows.";
     $("vReveal").classList.add("hidden");
     return;
   }
@@ -539,14 +556,14 @@ function renderDict() {
   const norm = (x) => x.toLowerCase().replace(/[\s'-]/g, "");
   const onlyReadable = $("dictReadable").checked;
   const rows = VOCAB.filter((w) => {
-    if (onlyReadable && !readable(w, S.studyGroups)) return false;
+    if (onlyReadable && !canRead(w, S)) return false;
     if (!q) return true;
     return w.kana.includes(q) || (w.kanji && w.kanji.includes(q)) || norm(w.romaji).includes(norm(q)) || w.en.toLowerCase().includes(q);
   });
-  const can = VOCAB.filter((w) => readable(w, S.studyGroups)).length;
+  const can = VOCAB.filter((w) => canRead(w, S)).length;
   $("dictStatus").textContent = `${rows.length} words shown · you can read ${can} of ${VOCAB.length} with the kana you've picked`;
   $("dictList").innerHTML = rows.slice(0, 400).map((w) =>
-    `<div class="drow${readable(w, S.studyGroups) ? "" : " locked"}"><span class="jp">${esc(w.kana)}</span><span class="romaji">${esc(w.romaji)}</span><span class="en">${esc(w.en)}${w.kanji ? ` <span class="jp meta">${esc(w.kanji)}</span>` : ""}</span><span class="meta">${esc(w.topic)}</span><button data-say="${esc(w.kana)}" title="Hear it">🔊</button></div>`
+    `<div class="drow${canRead(w, S) ? "" : " locked"}"><span class="jp">${esc(w.kana)}</span><span class="romaji">${esc(w.romaji)}</span><span class="en">${esc(w.en)}${w.kanji ? ` <span class="jp meta">${esc(w.kanji)}</span>` : ""}</span><span class="meta">${esc(w.topic)}</span><button data-say="${esc(w.kana)}" title="Hear it">🔊</button></div>`
   ).join("");
 }
 $("dictSearch").addEventListener("input", renderDict);
@@ -555,15 +572,20 @@ $("dictList").addEventListener("click", (e) => { const b = e.target.closest("[da
 
 /* ---------- progress ---------- */
 function renderProgress() {
-  const kanaAll = GROUPS.flatMap((g) => g.cards.map(([k]) => k));
-  const solid = kanaAll.filter((k) => (db.items["kana:" + k]?.box || 0) >= MASTERED_BOX).length;
+  const solidOf = (groups) => {
+    const all = groups.flatMap((g) => g.cards.map(([k]) => k));
+    return `${all.filter((k) => (db.items["kana:" + k]?.box || 0) >= MASTERED_BOX).length} / ${all.length}`;
+  };
+  const kjs = kanjiSolid();
   const words = Object.entries(db.items).filter(([id, it]) => id.startsWith("word:") && it.box >= MASTERED_BOX).length;
   const todayMin = Math.round((db.days[today()]?.sec || 0) / 60);
   const stat = (b, s) => `<div class="stat"><b>${b}</b><span>${s}</span></div>`;
   $("stats").innerHTML = [
     stat(`${streak()}`, "day streak"),
     stat(`${todayMin} / ${S.dailyGoalMin}`, "minutes today (in this app)"),
-    stat(`${solid} / ${kanaAll.length}`, "hiragana solid"),
+    stat(solidOf(GROUPS), "hiragana solid"),
+    stat(solidOf(KATA_GROUPS), "katakana solid"),
+    stat(`${kjs.solid} / ${kjs.total}`, "kanji solid"),
     stat(`${words}`, "words solid"),
     stat(`${db.mistakes.length}`, "mistakes logged"),
     stat(`$${costSoFar().toFixed(2)}`, "estimated API spend"),
@@ -576,6 +598,8 @@ function renderProgress() {
   }
   $("days").innerHTML = days.join("");
   $("kanaGrid").innerHTML = chartHTML(GROUPS.map((g) => g.name), true);
+  $("kataGrid").innerHTML = chartHTML(KATA_GROUPS.map((g) => g.name), true, KATA_GROUPS);
+  $("kanjiGrid").innerHTML = kanjiGridHTML(null, true);
   const conf = Object.entries(db.confusions || {}).sort((a, b) => b[1] - a[1]).slice(0, 12);
   $("confusions").innerHTML = conf.map(([pair, n]) => {
     const [a, b] = pair.split("|");
