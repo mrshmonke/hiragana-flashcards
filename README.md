@@ -14,7 +14,8 @@ Then open **Japanese Tutor** from the app launcher. If the installer says so, ru
 
 - **Tutor**: conversation, Okinawa role-play, drills, anime line breakdowns, or ask anything. Press 🎤 (or Ctrl+M) and talk in Japanese or English; it stops listening when you pause, and reads replies aloud. It corrects mistakes plainly and doesn't flatter. It logs mistakes and new words and keeps notes on your level.
 - **Lessons**: a step-by-step course: all of hiragana, then greetings, introducing yourself, first sentences, numbers and prices, ordering food, and Okinawan words. Each lesson is a short read with examples you can hear, then a quiz (80% to pass). Passing a kana lesson adds those rows to Kana practice.
-- **Kana**: type the romaji, or **Trip Up** mode for look-alike kana in your set. Always shuffled.
+- **Kana**: hiragana or katakana (including the foreign-sound combos like ファ and ティ). Type the romaji, or **Trip Up** mode for look-alike kana in your set (シ/ツ, ソ/ン...). Always shuffled.
+- **Kanji**: about 100 beginner kanji (mostly JLPT N5) in themed sets, with meanings, on/kun readings and example words you can hear.
 - **Vocab**, **Dictionary**, **Progress** (streak, minutes, kana chart, mix-ups, mistakes, API spend, export/import).
 - **Kana font**: Textbook (like a printed chart) or Variable (rotating styles).
 
@@ -28,7 +29,7 @@ Then open **Japanese Tutor** from the app launcher. If the installer says so, ru
 
 ## iPhone app
 
-Lessons, Kana (typing and Trip Up), Vocab, Dictionary and Progress on your iPhone. No tutor. Works offline, no App Store, no Mac needed.
+Lessons, Kana (hiragana and katakana, typing and Trip Up), Kanji, Vocab, Dictionary and Progress on your iPhone. No tutor. Works offline, no App Store, no Mac needed.
 
 1. On the iPhone, open **https://mrshmonke.github.io/hiragana-flashcards/ios/** in Safari.
 2. Tap Share, then **Add to Home Screen**. Open it from the new **Hiragana** icon.

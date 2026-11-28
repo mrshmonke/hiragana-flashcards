@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="fonts/fonts.css">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="lessons.css">
+<link rel="stylesheet" href="kanji.css">
 </head>
 <body>
 <header>
@@ -19,6 +20,7 @@
     <button data-tab="tutor" class="on">Tutor</button>
     <button data-tab="lessons">Lessons</button>
     <button data-tab="kana">Kana</button>
+    <button data-tab="kanji">Kanji</button>
     <button data-tab="vocab">Vocab</button>
     <button data-tab="dict">Dictionary</button>
     <button data-tab="progress">Progress</button>
@@ -62,6 +64,10 @@
   <!-- KANA -->
   <section id="kana" class="tab">
     <div class="bar">
+      <select id="kanaScript" aria-label="Script">
+        <option value="hira">Hiragana あ</option>
+        <option value="kata">Katakana ア</option>
+      </select>
       <button id="pickGroups" class="ghost">Choose kana…</button>
       <button id="showChart" class="ghost">Chart</button>
       <select id="kanaMode" aria-label="Practice type">
@@ -93,6 +99,32 @@
         <button id="kanaNext" class="primary hidden">Next (Enter)</button>
       </div>
     </div>
+  </section>
+
+  <!-- KANJI -->
+  <section id="kanji" class="tab">
+    <div class="bar">
+      <button id="kjPick" class="ghost">Kanji sets…</button>
+      <button id="kjListBtn" class="ghost">List</button>
+      <select id="kjDir" aria-label="Direction">
+        <option value="kanji">Kanji → meaning</option>
+        <option value="meaning">Meaning → kanji</option>
+      </select>
+      <span id="kjInfo" class="muted small"></span>
+    </div>
+    <div id="kjPicker" class="picker hidden"></div>
+    <div id="kjList" class="hidden"></div>
+    <div id="kjCard" class="card">
+      <div id="kjFront" class="kanji-big"></div>
+      <div id="kjBack" class="back hidden"></div>
+      <div class="row center">
+        <button id="kjSay" class="ghost" title="Hear an example word">🔊</button>
+        <button id="kjReveal" class="primary">Show answer (Space)</button>
+        <button id="kjMiss" class="bad hidden">Missed it (←)</button>
+        <button id="kjKnew" class="good hidden">Knew it (→)</button>
+      </div>
+    </div>
+    <p class="muted small">On readings come from Chinese and are written in katakana; they're mostly used in words of two or more kanji. Kun readings are native Japanese, written in hiragana, and often used when the kanji stands alone.</p>
   </section>
 
   <!-- VOCAB -->
@@ -140,6 +172,11 @@
     <h3>Hiragana</h3>
     <p class="muted small">Colour shows how well each kana is sticking in review: white not seen yet, red shaky, yellow learning, green solid. * marks readings that break the row's pattern.</p>
     <div id="kanaGrid"></div>
+    <h3>Katakana</h3>
+    <div id="kataGrid"></div>
+    <h3>Kanji</h3>
+    <p class="muted small">Click a kanji for its readings and example words.</p>
+    <div id="kanjiGrid"></div>
     <h3>Kana you mix up (Trip Up)</h3>
     <div id="confusions" class="list"></div>
     <h3>Recent mistakes the tutor logged</h3>

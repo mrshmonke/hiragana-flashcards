@@ -31,7 +31,7 @@ function groupsUpTo(lesson) {
 function newlyReadable(lesson) {
   if (!lesson.groups) return [];
   const have = groupsUpTo(lesson), fresh = new Set(lesson.groups);
-  return VOCAB.filter((w) => readable(w, have) && [...w.groups].some((g) => fresh.has(g)));
+  return VOCAB.filter((w) => w.script !== "kata" && readable(w, have) && [...w.groups].some((g) => fresh.has(g)));
 }
 
 function buildQuiz(lesson) {
