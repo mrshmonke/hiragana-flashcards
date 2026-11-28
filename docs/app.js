@@ -2,8 +2,9 @@ import { db, save, saveNow, today, activity, streak, grade, pickNext, countDue, 
 import { GROUPS, KANA, VOCAB, readable, romajiMatches, lookalikesIn } from "./kana.js";
 import { MODELS, MODES, newSession, send, costSoFar, extractLeakedCalls } from "./tutor.js";
 import * as voice from "./voice.js";
+import { mountLessons } from "./lessons-ui.js";
 
-const VERSION = "10";
+const VERSION = "11";
 const $ = (id) => document.getElementById(id);
 const S = db.settings;
 
@@ -18,6 +19,7 @@ function showTab(name) {
   if (name === "vocab" && !vCur) nextVocab();
   if (name === "dict") { renderDict(); setTimeout(() => $("dictSearch").focus(), 0); }
   if (name === "tutor") refreshKeyBanner();
+  if (name === "lessons") lessons?.show();
 }
 $("tabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) showTab(b.dataset.tab); });
 document.addEventListener("click", (e) => { const a = e.target.closest("[data-goto]"); if (a) { e.preventDefault(); showTab(a.dataset.goto); } });
@@ -735,6 +737,12 @@ $("testVoice").onclick = () => {
   $("voiceCheck").textContent = voice.hasJapaneseVoice() ? "" : "No Japanese voice found. Install the voice helper (see the README).";
   voice.speak("こんにちは。にほんごの れんしゅうを しましょう。", { jaRate: S.jaRate });
 };
+
+/* ---------- lessons ---------- */
+var lessons = mountLessons($("lessons"), {
+  say: (t) => voice.speak(t, { jaRate: S.jaRate }),
+  onKanaAdded: () => { kanaCur = null; vCur = null; trip = null; },
+});
 
 window.addEventListener("pagehide", saveNow);
 document.addEventListener("visibilitychange", () => { if (document.hidden) saveNow(); });

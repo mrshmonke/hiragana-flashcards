@@ -16,10 +16,13 @@
 <link rel="icon" href="../icon-192.png">
 <link rel="stylesheet" href="../fonts/fonts.css">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="../lessons.css">
 </head>
 <body>
 <main>
   <!-- KANA -->
+  <section id="lessons" class="tab"></section>
+
   <section id="kana" class="tab on">
     <div class="bar">
       <select id="kanaMode" aria-label="Practice type">
@@ -135,6 +138,7 @@
 </main>
 
 <nav id="tabs" role="tablist">
+  <button data-tab="lessons"><span class="ic">📖</span>Lessons</button>
   <button data-tab="kana" class="on"><span class="ic jp">あ</span>Kana</button>
   <button data-tab="vocab"><span class="ic jp">ことば</span>Vocab</button>
   <button data-tab="dict"><span class="ic">🔍</span>Dictionary</button>
